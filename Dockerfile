@@ -15,8 +15,8 @@ RUN git clone https://github.com/mod-playerbots/mod-playerbots.git modules/mod-p
 
 # Modul-SQLs für später sichern
 RUN mkdir -p /export/sql-custom && \
-    cp -r modules/mod-playerbots/sql/ /export/sql-custom/
-
+    cp -r modules/mod-playerbots/data/sql/ /export/sql-custom/
+    
 # Kompilieren (wir nutzen Clang, da es schneller ist)
 RUN mkdir build && cd build && \
     cmake ../ -DCMAKE_INSTALL_PREFIX=/azerothcore/env/dist \
