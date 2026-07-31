@@ -11,6 +11,8 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /build
 COPY . .
 
+RUN git clone https://github.com/mod-playerbots/mod-playerbots.git modules/mod-playerbots
+
 # Modul-SQLs für später sichern
 RUN mkdir -p /export/sql-custom && \
     cp -r modules/mod-playerbots/sql/ /export/sql-custom/
