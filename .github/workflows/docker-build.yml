@@ -1,1 +1,47 @@
+name: Build AzerothCore Playerbots
 
+on:
+  push:
+    branches: [ "Playerbot" ]
+  workflow_dispatch: # Erlaubt dir, den Build jederzeit manuell per Klick zu starten
+
+env:
+  REGISTRY: ghcr.io
+  # GitHub setzt hier automatisch deinen Benutzernamen und Reponamen ein
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          ref: Playerbot
+
+      - name: Clone mod-playerbots (Modul in den Quellcode laden)
+        run: git clone https://github.com/mod-playerbots/mod-playerbots.git modules/mod-playerbots
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Image Name formatieren (Lowercase Zwang für Docker)
+        id: string
+        uses: ASzc/change-string-case-action@v6
+        with:
+          string: ${{ env.IMAGE_NAME }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ steps.string.outputs.lowercase }}:latest
