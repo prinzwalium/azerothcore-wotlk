@@ -28,11 +28,10 @@ RUN mkdir build && cd build && \
 FROM ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Nur die Laufzeitumgebung installieren (kein Compiler mehr nötig)
+# Nur die Laufzeitumgebung installieren
 RUN apt-get update && apt-get install -y \
     libssl3 default-mysql-client tzdata curl unzip \
-    libboost-system1.74.0 libboost-filesystem1.74.0 libboost-iostreams1.74.0 \
-    libboost-program-options1.74.0 libboost-regex1.74.0 libboost-thread1.74.0 \
+    libboost-all-dev \
     libmysqlclient21 libreadline8 libbz2-1.0 libncurses6 \
     && rm -rf /var/lib/apt/lists/*
 
