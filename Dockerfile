@@ -32,6 +32,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y \
     libssl3 default-mysql-client libboost-system1.74.0 \
     libboost-filesystem1.74.0 libboost-iostreams1.74.0 tzdata curl unzip \
+    libmysqlclient21 libreadline8 libbz2-1.0 libncurses6 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /azerothcore
