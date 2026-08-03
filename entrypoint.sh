@@ -37,9 +37,10 @@ if [[ "$*" == *worldserver* ]]; then
         unzip -q $DATA_DIR/data.zip -d $DATA_DIR && rm $DATA_DIR/data.zip
     fi
     
-    # 2. Base World Database prüfen
+   # 2. Base World Database prüfen
     mkdir -p "$SQL_WORLD_DIR"
-    if ! ls $SQL_WORLD_DIR/*.sql 1> /dev/null 2>&1; then
+    # Wir prüfen auf eine DB-Datei, die > 100MB ist, oder einen spezifischen Präfix hat
+    if ! ls $SQL_WORLD_DIR/acore-db-*.sql 1> /dev/null 2>&1; then
         echo "[AutoSetup] World Base-DB fehlt! Lade neuesten ACDB Dump über GitHub-API herunter..."
         DB_URL=$(curl -s https://api.github.com/repos/azerothcore/azerothcore-wotlk/releases/latest | grep "browser_download_url.*acore-db.*\.zip" | cut -d '"' -f 4)
         
