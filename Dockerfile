@@ -1,23 +1,18 @@
-# Stage 1: Der Builder (kompiliert den Code)
+# Stage 1: Der Builder (Kompiliert den Server)
 FROM ubuntu:22.04 AS builder
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Bausteine und Compiler installieren
+# Bausteine und Compiler installieren (mit MySQL-Dev Paketen!)
 RUN apt-get update && apt-get install -y \
     git cmake make gcc g++ clang libssl-dev libbz2-dev libreadline-dev \
-    libncurses-dev libboost-all-dev libmariadb-dev-compat libmariadb-dev
+    libncurses-dev libboost-all-dev default-libmysqlclient-dev
 
-# Quellcode wird von GitHub Actions in diesen Ordner kopiert
-WORKDIR /build
-COPY . .
+WORKDIR /export
+# Das Repo klonen (Playerbot branch)
+RUN git clone --branch Playerbot --depth 1 https://github.com/liammitchell/azerothcore-wotlk.git /azerothcore
 
-RUN git clone https://github.com/mod-playerbots/mod-playerbots.git modules/mod-playerbots
-
-# Modul-SQLs für später sichern
-RUN mkdir -p /export/sql-custom && \
-    cp -r modules/mod-playerbots/data/sql/ /export/sql-custom/
-    
-# Kompilieren (wir nutzen Clang, da es schneller ist)
+WORKDIR /azerothcore
+# Kompilieren
 RUN mkdir build && cd build && \
     cmake ../ -DCMAKE_INSTALL_PREFIX=/azerothcore/env/dist \
     -DTOOLS_BUILD=all -DSCRIPTS=static \
@@ -28,11 +23,11 @@ RUN mkdir build && cd build && \
 FROM ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Nur die Laufzeitumgebung installieren
+# Nur die Laufzeitumgebung installieren (mit MySQL-Client Paketen!)
 RUN apt-get update && apt-get install -y \
-    libssl3 mariadb-client tzdata curl unzip git \
+    libssl3 default-mysql-client tzdata curl unzip git \
     libboost-all-dev \
-    libmariadb3 libreadline8 libbz2-1.0 libncurses6 \
+    libmysqlclient21 libreadline8 libbz2-1.0 libncurses6 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /azerothcore
