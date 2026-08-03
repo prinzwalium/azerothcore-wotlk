@@ -45,25 +45,15 @@ if [[ "$*" == *worldserver* ]]; then
     fi
     
    # 2. Base World Database prüfen
-    mkdir -p "$SQL_WORLD_DIR"
-    # Wir prüfen auf eine DB-Datei, die > 100MB ist, oder einen spezifischen Präfix hat
-    if ! ls $SQL_WORLD_DIR/acore-db-*.sql 1> /dev/null 2>&1; then
-        echo "[AutoSetup] World Base-DB fehlt! Lade neuesten ACDB Dump über GitHub-API herunter..."
-        DB_URL=$(curl -s https://api.github.com/repos/azerothcore/azerothcore-wotlk/releases/latest | grep "browser_download_url.*acore-db.*\.zip" | cut -d '"' -f 4)
-        
-        if [ -n "$DB_URL" ]; then
-            curl -L -o acdb.zip "$DB_URL"
-            unzip -q acdb.zip -d acdb_ext
-            # Verschiebe die extrahierte SQL-Datei in den Auto-Updater Ordner
-            find acdb_ext -name "*.sql" -exec mv {} $SQL_WORLD_DIR/ \;
-            rm -rf acdb.zip acdb_ext
-            echo "[AutoSetup] Base-DB erfolgreich für den Import bereitgestellt."
-        else
-            echo "[AutoSetup] Fehler: Konnte DB-URL nicht von GitHub abrufen."
-        fi
-    else
-        echo "[AutoSetup] World Base-DB bereits vorhanden."
-    fi
+mkdir -p "$SQL_WORLD_DIR"
+
+# Wenn der Ordner auf dem Volume leer ist, kopieren wir die SQL-Dateien aus dem Image dorthin
+if [ -z "$(ls -A $SQL_WORLD_DIR 2>/dev/null)" ]; then
+    echo "[AutoSetup] Kopiere World Base-DB aus dem Image..."
+    cp -r /azerothcore/data/sql/base/db_world/* "$SQL_WORLD_DIR/"
+else
+    echo "[AutoSetup] World Base-DB bereits vorhanden."
+fi
 fi
 # --------------------------------------------
 
