@@ -34,7 +34,6 @@ WORKDIR /azerothcore
 
 # Die fertigen Server-Dateien kopieren
 COPY --from=builder /azerothcore/env/dist ./env/dist
-COPY --from=builder /export/sql-custom ./sql-custom
 
 # Das Automatisierungs-Skript kopieren und ausführbar machen
 COPY entrypoint.sh /entrypoint.sh
