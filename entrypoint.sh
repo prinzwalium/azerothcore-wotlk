@@ -20,22 +20,36 @@ sed -i "s/127.0.0.1;3306;acore;acore/ac-database;3306;root;${DB_PASS}/g" $CONF_D
 # Den Pfad zu den Map-Daten in der Config anpassen
 sed -i 's/^DataDir =.*/DataDir = "\/azerothcore\/env\/dist\/data"/g' $CONF_DIR/worldserver.conf
 
-# --- NEU: Der automatische Map-Downloader (NUR für den Worldserver) ---
+# --- NEU: Der intelligente Map-Downloader (NUR für den Worldserver) ---
 if [[ "$*" == *worldserver* ]]; then
     mkdir -p "$DATA_DIR"
-    if [ ! -d "$DATA_DIR/dbc" ]; then
-        echo "[AutoSetup] Map-Daten nicht gefunden! Lade Client-Daten herunter (Das dauert einige Minuten)..."
-        curl -L -o $DATA_DIR/data.zip https://github.com/wowgaming/client-data/releases/download/v8/data.zip
-        
-        echo "[AutoSetup] Entpacke Map-Daten..."
+    
+    # Stufe 1: Sind die entpackten Daten schon da?
+    if [ -d "$DATA_DIR/dbc" ] && [ -d "$DATA_DIR/maps" ]; then
+        echo "[AutoSetup] Map-Daten bereits entpackt vorhanden, überspringe Download."
+    
+    # Stufe 2: Liegt wenigstens die ZIP-Datei bereit?
+    elif [ -f "$DATA_DIR/data.zip" ]; then
+        echo "[AutoSetup] data.zip gefunden! Entpacke Map-Daten..."
         unzip -q $DATA_DIR/data.zip -d $DATA_DIR
-        
         echo "[AutoSetup] Lösche Zip-Archiv..."
         rm $DATA_DIR/data.zip
-        
         echo "[AutoSetup] Map-Daten erfolgreich installiert!"
+        
+    # Stufe 3: Nichts da. Gibt es eine Download-URL als ENV?
+    elif [ -n "$MAP_DOWNLOAD_URL" ]; then
+        echo "[AutoSetup] Map-Daten nicht gefunden! Lade von URL herunter: $MAP_DOWNLOAD_URL"
+        curl -L -o $DATA_DIR/data.zip "$MAP_DOWNLOAD_URL"
+        echo "[AutoSetup] Entpacke Map-Daten..."
+        unzip -q $DATA_DIR/data.zip -d $DATA_DIR
+        echo "[AutoSetup] Lösche Zip-Archiv..."
+        rm $DATA_DIR/data.zip
+        echo "[AutoSetup] Map-Daten erfolgreich installiert!"
+        
+    # Fallback: Keine Daten, keine ZIP, keine URL.
     else
-        echo "[AutoSetup] Map-Daten bereits vorhanden, überspringe Download."
+        echo "[AutoSetup] WARNUNG: Keine Map-Daten, keine data.zip und keine MAP_DOWNLOAD_URL gefunden!"
+        echo "[AutoSetup] Der Server wird versuchen ohne Maps zu starten (was wahrscheinlich fehlschlagen wird)."
     fi
 fi
 # --------------------------------------------
