@@ -5,7 +5,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Bausteine und Compiler installieren
 RUN apt-get update && apt-get install -y \
     git cmake make gcc g++ clang libssl-dev libbz2-dev libreadline-dev \
-    libncurses-dev libboost-all-dev default-libmysqlclient-dev
+    libncurses-dev libboost-all-dev libmariadb-dev-compat libmariadb-dev
 
 # Quellcode wird von GitHub Actions in diesen Ordner kopiert
 WORKDIR /build
@@ -24,22 +24,26 @@ RUN mkdir build && cd build && \
     -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ && \
     make -j$(nproc) && make install
 
-# Stage 2: Der Runner (das finale, kleine Image für deinen VPS)
+# Stage 2: Der Runner (das finale Image)
 FROM ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Nur die Laufzeitumgebung installieren
 RUN apt-get update && apt-get install -y \
-    libssl3 default-mysql-client tzdata curl unzip \
+    libssl3 mariadb-client tzdata curl unzip git \
     libboost-all-dev \
-    libmysqlclient21 libreadline8 libbz2-1.0 libncurses6 \
+    libmariadb3 libreadline8 libbz2-1.0 libncurses6 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /azerothcore
 
-# Die fertigen Server-Dateien aus Stage 1 kopieren
+# Die fertigen Server-Dateien kopieren
 COPY --from=builder /azerothcore/env/dist ./env/dist
-# Die SQL Dateien des Moduls für spätere DB-Updates kopieren
 COPY --from=builder /export/sql-custom ./sql-custom
 
-EXPOSE 8085 3724
+# Das Automatisierungs-Skript kopieren und ausführbar machen
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Das Skript fängt jeden Startbefehl ab und bereitet die Configs vor
+ENTRYPOINT ["/entrypoint.sh"]
