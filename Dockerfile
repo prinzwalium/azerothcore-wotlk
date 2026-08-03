@@ -8,14 +8,20 @@ RUN apt-get update && apt-get install -y \
     libncurses-dev libboost-all-dev default-libmysqlclient-dev
 
 WORKDIR /export
-# Das Repo klonen (Playerbot branch)
-RUN git clone --branch Playerbot --depth 1 https://github.com/prinzwalium/azerothcore-wotlk.git /azerothcore
+# Das Repo klonen (inklusive aller verlinkten Submodule!)
+RUN git clone --branch Playerbot --depth 1 --recurse-submodules https://github.com/prinzwalium/azerothcore-wotlk.git /azerothcore
 
 # --- DIE MODS ---
 WORKDIR /azerothcore/modules
 
 # AH-Bot (Wirtschaft) - DEAKTIVIERT wegen Playerbot-Konflikt
 # RUN git clone https://github.com/azerothcore/mod-ah-bot.git
+
+# --- DIE MODS ---
+WORKDIR /azerothcore/modules
+
+# 1. Playerbots (Zwingend das Modul laden, falls es kein Submodule war)
+RUN git clone https://github.com/liammitchell/Playerbot.git mod-playerbots || true
 
 # 2. Flächen-Plündern (Komfort)
 RUN git clone https://github.com/azerothcore/mod-aoe-loot.git
