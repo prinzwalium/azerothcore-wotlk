@@ -4,6 +4,7 @@ set -e
 echo "[AutoSetup] Bereite Konfigurationsdateien vor..."
 CONF_DIR="/azerothcore/env/dist/etc"
 DATA_DIR="/azerothcore/env/dist/data"
+SQL_WORLD_DIR="/azerothcore/data/sql/base/db_world"
 
 # Configs aus den Vorlagen erstellen
 cp -n $CONF_DIR/worldserver.conf.dist $CONF_DIR/worldserver.conf 2>/dev/null || true
@@ -20,41 +21,43 @@ sed -i "s/127.0.0.1;3306;acore;acore/ac-database;3306;root;${DB_PASS}/g" $CONF_D
 # Den Pfad zu den Map-Daten in der Config anpassen
 sed -i 's/^DataDir =.*/DataDir = "\/azerothcore\/env\/dist\/data"/g' $CONF_DIR/worldserver.conf
 
-# --- NEU: Der intelligente Map-Downloader (NUR für den Worldserver) ---
+# --- Worldserver-exklusive Downloads ---
 if [[ "$*" == *worldserver* ]]; then
+    
+    # 1. Map-Daten prüfen
     mkdir -p "$DATA_DIR"
-    
-    # Stufe 1: Sind die entpackten Daten schon da?
     if [ -d "$DATA_DIR/dbc" ] && [ -d "$DATA_DIR/maps" ]; then
-        echo "[AutoSetup] Map-Daten bereits entpackt vorhanden, überspringe Download."
-    
-    # Stufe 2: Liegt wenigstens die ZIP-Datei bereit?
+        echo "[AutoSetup] Map-Daten bereits vorhanden."
     elif [ -f "$DATA_DIR/data.zip" ]; then
         echo "[AutoSetup] data.zip gefunden! Entpacke Map-Daten..."
-        unzip -q $DATA_DIR/data.zip -d $DATA_DIR
-        echo "[AutoSetup] Lösche Zip-Archiv..."
-        rm $DATA_DIR/data.zip
-        echo "[AutoSetup] Map-Daten erfolgreich installiert!"
-        
-    # Stufe 3: Nichts da. Gibt es eine Download-URL als ENV?
+        unzip -q $DATA_DIR/data.zip -d $DATA_DIR && rm $DATA_DIR/data.zip
     elif [ -n "$MAP_DOWNLOAD_URL" ]; then
-        echo "[AutoSetup] Map-Daten nicht gefunden! Lade von URL herunter: $MAP_DOWNLOAD_URL"
+        echo "[AutoSetup] Lade Maps herunter..."
         curl -L -o $DATA_DIR/data.zip "$MAP_DOWNLOAD_URL"
-        echo "[AutoSetup] Entpacke Map-Daten..."
-        unzip -q $DATA_DIR/data.zip -d $DATA_DIR
-        echo "[AutoSetup] Lösche Zip-Archiv..."
-        rm $DATA_DIR/data.zip
-        echo "[AutoSetup] Map-Daten erfolgreich installiert!"
+        unzip -q $DATA_DIR/data.zip -d $DATA_DIR && rm $DATA_DIR/data.zip
+    fi
+    
+    # 2. Base World Database prüfen
+    mkdir -p "$SQL_WORLD_DIR"
+    if ! ls $SQL_WORLD_DIR/*.sql 1> /dev/null 2>&1; then
+        echo "[AutoSetup] World Base-DB fehlt! Lade neuesten ACDB Dump über GitHub-API herunter..."
+        DB_URL=$(curl -s https://api.github.com/repos/azerothcore/azerothcore-wotlk/releases/latest | grep "browser_download_url.*acore-db.*\.zip" | cut -d '"' -f 4)
         
-    # Fallback: Keine Daten, keine ZIP, keine URL.
+        if [ -n "$DB_URL" ]; then
+            curl -L -o acdb.zip "$DB_URL"
+            unzip -q acdb.zip -d acdb_ext
+            # Verschiebe die extrahierte SQL-Datei in den Auto-Updater Ordner
+            find acdb_ext -name "*.sql" -exec mv {} $SQL_WORLD_DIR/ \;
+            rm -rf acdb.zip acdb_ext
+            echo "[AutoSetup] Base-DB erfolgreich für den Import bereitgestellt."
+        else
+            echo "[AutoSetup] Fehler: Konnte DB-URL nicht von GitHub abrufen."
+        fi
     else
-        echo "[AutoSetup] WARNUNG: Keine Map-Daten, keine data.zip und keine MAP_DOWNLOAD_URL gefunden!"
-        echo "[AutoSetup] Der Server wird versuchen ohne Maps zu starten (was wahrscheinlich fehlschlagen wird)."
+        echo "[AutoSetup] World Base-DB bereits vorhanden."
     fi
 fi
 # --------------------------------------------
 
 echo "[AutoSetup] Configs bereit! Starte Server..."
-
-# Server-Befehl ausführen
 exec "$@"
