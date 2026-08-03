@@ -13,8 +13,10 @@ RUN git clone --branch Playerbot --depth 1 https://github.com/prinzwalium/azerot
 
 # --- DIE MODS ---
 WORKDIR /azerothcore/modules
-# 1. Auktionshaus-Bot (Wirtschaft)
-RUN git clone https://github.com/azerothcore/mod-ah-bot.git
+
+# AH-Bot (Wirtschaft) - DEAKTIVIERT wegen Playerbot-Konflikt
+# RUN git clone https://github.com/azerothcore/mod-ah-bot.git
+
 # 2. Flächen-Plündern (Komfort)
 RUN git clone https://github.com/azerothcore/mod-aoe-loot.git
 # 3. Transmog (Aussehen)
@@ -24,12 +26,12 @@ RUN git clone https://github.com/noisiver/mod-accountbound.git
 # ----------------
 
 WORKDIR /azerothcore
-# Kompilieren
+# Kompilieren (Mit besserer Fehler-Ausgabe)
 RUN mkdir build && cd build && \
     cmake ../ -DCMAKE_INSTALL_PREFIX=/azerothcore/env/dist \
     -DTOOLS_BUILD=all -DSCRIPTS=static \
     -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ && \
-    make -j$(nproc) && make install
+    make -j$(nproc) --no-print-directory || make -j1 --no-print-directory && make install
 
 # Stage 2: Der Runner (das finale Image)
 FROM ubuntu:22.04
