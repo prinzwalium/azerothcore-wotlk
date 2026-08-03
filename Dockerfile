@@ -11,6 +11,18 @@ WORKDIR /export
 # Das Repo klonen (Playerbot branch)
 RUN git clone --branch Playerbot --depth 1 https://github.com/prinzwalium/azerothcore-wotlk.git /azerothcore
 
+# --- DIE MODS ---
+WORKDIR /azerothcore/modules
+# 1. Auktionshaus-Bot (Wirtschaft)
+RUN git clone https://github.com/azerothcore/mod-ah-bot.git
+# 2. Flächen-Plündern (Komfort)
+RUN git clone https://github.com/azerothcore/mod-aoe-loot.git
+# 3. Transmog (Aussehen)
+RUN git clone https://github.com/azerothcore/mod-transmog.git
+# 4. Accountgebundene Mounts/Pets
+RUN git clone https://github.com/noisiver/mod-accountbound.git
+# ----------------
+
 WORKDIR /azerothcore
 # Kompilieren
 RUN mkdir build && cd build && \
