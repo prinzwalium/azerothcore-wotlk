@@ -20,20 +20,23 @@ sed -i "s/127.0.0.1;3306;acore;acore/ac-database;3306;root;${DB_PASS}/g" $CONF_D
 # Den Pfad zu den Map-Daten in der Config anpassen
 sed -i 's/^DataDir =.*/DataDir = "\/azerothcore\/env\/dist\/data"/g' $CONF_DIR/worldserver.conf
 
-# --- NEU: Der automatische Map-Downloader ---
-if [ ! -d "$DATA_DIR/dbc" ]; then
-    echo "[AutoSetup] Map-Daten nicht gefunden! Lade Client-Daten herunter (Das dauert einige Minuten)..."
-    curl -L -o $DATA_DIR/data.zip https://github.com/wowgaming/client-data/releases/download/v8/data.zip
-    
-    echo "[AutoSetup] Entpacke Map-Daten..."
-    unzip -q $DATA_DIR/data.zip -d $DATA_DIR
-    
-    echo "[AutoSetup] Lösche Zip-Archiv..."
-    rm $DATA_DIR/data.zip
-    
-    echo "[AutoSetup] Map-Daten erfolgreich installiert!"
-else
-    echo "[AutoSetup] Map-Daten bereits vorhanden, überspringe Download."
+# --- NEU: Der automatische Map-Downloader (NUR für den Worldserver) ---
+if [[ "$*" == *worldserver* ]]; then
+    mkdir -p "$DATA_DIR"
+    if [ ! -d "$DATA_DIR/dbc" ]; then
+        echo "[AutoSetup] Map-Daten nicht gefunden! Lade Client-Daten herunter (Das dauert einige Minuten)..."
+        curl -L -o $DATA_DIR/data.zip https://github.com/wowgaming/client-data/releases/download/v8/data.zip
+        
+        echo "[AutoSetup] Entpacke Map-Daten..."
+        unzip -q $DATA_DIR/data.zip -d $DATA_DIR
+        
+        echo "[AutoSetup] Lösche Zip-Archiv..."
+        rm $DATA_DIR/data.zip
+        
+        echo "[AutoSetup] Map-Daten erfolgreich installiert!"
+    else
+        echo "[AutoSetup] Map-Daten bereits vorhanden, überspringe Download."
+    fi
 fi
 # --------------------------------------------
 
