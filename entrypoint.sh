@@ -9,8 +9,15 @@ SQL_WORLD_DIR="/azerothcore/data/sql/base/db_world"
 # Configs aus den Vorlagen erstellen
 cp -n $CONF_DIR/worldserver.conf.dist $CONF_DIR/worldserver.conf 2>/dev/null || true
 cp -n $CONF_DIR/authserver.conf.dist $CONF_DIR/authserver.conf 2>/dev/null || true
+
+# Module-Configs automatisch vorbereiten
 mkdir -p $CONF_DIR/modules
-cp -n $CONF_DIR/modules/playerbots.conf.dist $CONF_DIR/modules/playerbots.conf 2>/dev/null || true
+if ls $CONF_DIR/modules/*.conf.dist 1> /dev/null 2>&1; then
+    for conf_dist in $CONF_DIR/modules/*.conf.dist; do
+        conf_file="${conf_dist%.dist}"
+        cp -n "$conf_dist" "$conf_file" 2>/dev/null || true
+    done
+fi
 
 # Zugangsdaten eintragen
 DB_PASS=${DB_PASSWORD:-"8BvjmZFexf9piYpqHKnIzIm5ysIXBbFwsDbao6qXJpQiSyzp8A13qoZ9sI1D5txm"}
