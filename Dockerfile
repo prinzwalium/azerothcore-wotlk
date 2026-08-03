@@ -20,7 +20,7 @@ WORKDIR /azerothcore/modules
 # 2. Flächen-Plündern (Komfort)
 RUN git clone https://github.com/azerothcore/mod-aoe-loot.git
 # 3. Transmog (Aussehen)
-RUN git clone https://github.com/azerothcore/mod-transmog.git
+#RUN git clone https://github.com/azerothcore/mod-transmog.git
 ## 4. Accountgebundene Mounts/Pets
 #RUN git clone https://github.com/noisiver/mod-accountbound.git
 # ----------------
