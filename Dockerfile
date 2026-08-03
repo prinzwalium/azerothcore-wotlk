@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /export
 # Das Repo klonen (Playerbot branch)
-RUN git clone --branch Playerbot --depth 1 https://github.com/liammitchell/azerothcore-wotlk.git /azerothcore
+RUN git clone --branch Playerbot --depth 1 https://github.com/prinzwalium/azerothcore-wotlk.git /azerothcore
 
 WORKDIR /azerothcore
 # Kompilieren
