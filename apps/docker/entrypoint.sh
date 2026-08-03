@@ -49,6 +49,34 @@ else
     touch "$CONF"
 fi
 
+# Module configs are only read from "<name>.conf", never from "<name>.conf.dist",
+# so every shipped module config gets materialized the same way as the component
+# config above. Without this, playerbots.conf would never exist and every
+# AiPlayerbot.* setting would silently fall back to its compiled-in default.
+if [[ -d "$CONF_DIR/modules" ]]; then
+    shopt -s nullglob
+    for module_conf_dist in "$CONF_DIR"/modules/*.conf.dist; do
+        cp -vn "$module_conf_dist" "${module_conf_dist%.dist}"
+    done
+    shopt -u nullglob
+fi
+
+# Everything below only runs in the db-import container, which runs to
+# completion before the auth/world servers are started.
+if [[ "$ACORE_COMPONENT" == "dbimport" ]]; then
+    "$@"
+
+    # shellcheck source=/dev/null
+    source /azerothcore/apps/docker/scripts/bootstrap.sh
+
+    # Neither step is worth failing the import (and with it the whole stack)
+    # over: the databases are already in place at this point.
+    ac_bootstrap_realmlist || echo "[bootstrap] Realmlist update failed, continuing." >&2
+    ac_bootstrap_admin_account || echo "[bootstrap] Admin account creation failed, continuing." >&2
+
+    exit 0
+fi
+
 echo "Starting $ACORE_COMPONENT..."
 
 exec "$@"

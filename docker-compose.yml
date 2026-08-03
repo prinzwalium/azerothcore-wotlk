@@ -37,12 +37,21 @@ services:
         USER_ID: ${DOCKER_USER_ID:-1000}
         GROUP_ID: ${DOCKER_GROUP_ID:-1000}
         DOCKER_USER: ${DOCKER_USER:-acore}
+        PLAYERBOTS_REPO: ${PLAYERBOTS_REPO:-https://github.com/mod-playerbots/mod-playerbots.git}
+        PLAYERBOTS_REF: ${PLAYERBOTS_REF:-master}
     environment:
       AC_DATA_DIR: "/azerothcore/env/dist/data"
       AC_LOGS_DIR: "/azerothcore/env/dist/logs"
       AC_LOGIN_DATABASE_INFO: "ac-database;3306;root;${DOCKER_DB_ROOT_PASSWORD:-password};acore_auth"
       AC_WORLD_DATABASE_INFO: "ac-database;3306;root;${DOCKER_DB_ROOT_PASSWORD:-password};acore_world"
       AC_CHARACTER_DATABASE_INFO: "ac-database;3306;root;${DOCKER_DB_ROOT_PASSWORD:-password};acore_characters"
+      # Optional first-run bootstrap, see apps/docker/scripts/bootstrap.sh
+      REALM_ADDRESS: ${REALM_ADDRESS:-}
+      REALM_NAME: ${REALM_NAME:-AzerothCore}
+      REALM_PORT: ${DOCKER_WORLD_EXTERNAL_PORT:-8085}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ADMIN_GMLEVEL: ${ADMIN_GMLEVEL:-3}
     volumes:
       - ${DOCKER_VOL_ETC:-./env/dist/etc}:/azerothcore/env/dist/etc
       # [osxfs optimization]: https://stackoverflow.com/a/63437557/1964544
@@ -62,6 +71,8 @@ services:
         USER_ID: ${DOCKER_USER_ID:-1000}
         GROUP_ID: ${DOCKER_GROUP_ID:-1000}
         DOCKER_USER: ${DOCKER_USER:-acore}
+        PLAYERBOTS_REPO: ${PLAYERBOTS_REPO:-https://github.com/mod-playerbots/mod-playerbots.git}
+        PLAYERBOTS_REF: ${PLAYERBOTS_REF:-master}
     networks:
       - ac-network
     stdin_open: true
@@ -104,6 +115,8 @@ services:
         USER_ID: ${DOCKER_USER_ID:-1000}
         GROUP_ID: ${DOCKER_GROUP_ID:-1000}
         DOCKER_USER: ${DOCKER_USER:-acore}
+        PLAYERBOTS_REPO: ${PLAYERBOTS_REPO:-https://github.com/mod-playerbots/mod-playerbots.git}
+        PLAYERBOTS_REF: ${PLAYERBOTS_REF:-master}
     networks:
       - ac-network
     tty: true
@@ -153,6 +166,8 @@ services:
         USER_ID: ${DOCKER_USER_ID:-1000}
         GROUP_ID: ${DOCKER_GROUP_ID:-1000}
         DOCKER_USER: ${DOCKER_USER:-acore}
+        PLAYERBOTS_REPO: ${PLAYERBOTS_REPO:-https://github.com/mod-playerbots/mod-playerbots.git}
+        PLAYERBOTS_REF: ${PLAYERBOTS_REF:-master}
     working_dir: /azerothcore/env/client/
     volumes:
       # this is not the directory of the extracted data! It's the client folder used by the extractors
