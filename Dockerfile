@@ -36,7 +36,7 @@ WORKDIR /azerothcore
 RUN mkdir build && cd build && \
     cmake ../ -DCMAKE_INSTALL_PREFIX=/azerothcore/env/dist \
     -DTOOLS_BUILD=all -DSCRIPTS=static \
-    -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ && \
+    -DWITH_WARNINGS=0 -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ && \
     make -j$(nproc) --no-print-directory || make -j1 --no-print-directory && make install
 
 # Stage 2: Der Runner (das finale Image)
