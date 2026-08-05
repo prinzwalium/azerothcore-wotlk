@@ -8,9 +8,9 @@ cannot be created with plain SQL alone. This reimplements
 create the first admin account without a human attaching to the worldserver
 console.
 
-Username, password and GM level are read from the environment so that the
-password never shows up in the process list. The generated SQL is written to
-stdout, ready to be piped into the mysql client.
+Username, password and GM level are read from the environment (AC_ACCOUNT_*) so
+that the password never shows up in the process list. The generated SQL is
+written to stdout, ready to be piped into the mysql client.
 """
 
 import hashlib
@@ -41,13 +41,13 @@ def make_registration_data(username: str, password: str) -> "tuple[bytes, bytes]
 def main() -> int:
     # The core uppercases both before hashing (AccountMgr::CreateAccount), which
     # is what makes WoW logins case insensitive.
-    username = os.environ.get("ADMIN_USERNAME", "").strip().upper()
-    password = os.environ.get("ADMIN_PASSWORD", "").upper()
-    gmlevel = os.environ.get("ADMIN_GMLEVEL", "3").strip()
-    realm_id = os.environ.get("ADMIN_REALM_ID", "-1").strip()
+    username = os.environ.get("AC_ACCOUNT_USERNAME", "").strip().upper()
+    password = os.environ.get("AC_ACCOUNT_PASSWORD", "").upper()
+    gmlevel = os.environ.get("AC_ACCOUNT_GMLEVEL", "0").strip()
+    realm_id = os.environ.get("AC_ACCOUNT_REALM_ID", "-1").strip()
 
     if not username or not password:
-        print("ADMIN_USERNAME and ADMIN_PASSWORD must both be set", file=sys.stderr)
+        print("AC_ACCOUNT_USERNAME and AC_ACCOUNT_PASSWORD must both be set", file=sys.stderr)
         return 1
 
     if len(username) > MAX_ACCOUNT_LENGTH:
@@ -66,11 +66,11 @@ def main() -> int:
         gmlevel_value = int(gmlevel)
         realm_id_value = int(realm_id)
     except ValueError:
-        print("ADMIN_GMLEVEL and ADMIN_REALM_ID must be integers", file=sys.stderr)
+        print("AC_ACCOUNT_GMLEVEL and AC_ACCOUNT_REALM_ID must be integers", file=sys.stderr)
         return 1
 
     if not 0 <= gmlevel_value <= 3:
-        print("ADMIN_GMLEVEL must be between 0 and 3", file=sys.stderr)
+        print("AC_ACCOUNT_GMLEVEL must be between 0 and 3", file=sys.stderr)
         return 1
 
     salt, verifier = make_registration_data(username, password)

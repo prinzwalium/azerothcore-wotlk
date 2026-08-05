@@ -67,6 +67,12 @@ services:
       ADMIN_USERNAME: ${ADMIN_USERNAME:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       ADMIN_GMLEVEL: ${ADMIN_GMLEVEL:-3}
+      # Auction house bot characters. Creating them here (rather than by hand
+      # in the client) is what lets AuctionHouseBot.GUIDs be filled in
+      # automatically; the worldserver reads the result from the shared etc
+      # volume. Skipped entirely when AHBOT_CHARACTER_NAMES is empty.
+      AHBOT_CHARACTER_NAMES: ${AHBOT_CHARACTER_NAMES:-}
+      AHBOT_ACCOUNT_USERNAME: ${AHBOT_ACCOUNT_USERNAME:-AHBOT}
     volumes:
       - ac-etc:/azerothcore/env/dist/etc
       - ac-logs:/azerothcore/env/dist/logs
@@ -120,6 +126,16 @@ services:
       AC_AI_PLAYERBOT_RANDOM_BOT_AUTOLOGIN: ${PLAYERBOTS_RANDOM_BOT_AUTOLOGIN:-1}
       AC_AI_PLAYERBOT_MIN_RANDOM_BOTS: ${PLAYERBOTS_MIN_RANDOM_BOTS:-100}
       AC_AI_PLAYERBOT_MAX_RANDOM_BOTS: ${PLAYERBOTS_MAX_RANDOM_BOTS:-100}
+      # Auction house bot (mod-ah-bot-plus). The seller only does anything once
+      # AuctionHouseBot.GUIDs names real characters, which ac-db-import writes
+      # into etc/modules/mod_ahbot.conf on the first start.
+      #
+      # Deliberately not set here: AC_AUCTION_HOUSE_BOT_GUIDS. An environment
+      # variable wins over the config file, so setting it would override the
+      # GUIDs the bootstrap discovered.
+      AC_AUCTION_HOUSE_BOT_ENABLE_SELLER: ${AHBOT_SELLER_ENABLED:-1}
+      AC_AUCTION_HOUSE_BOT_BUYER_ENABLED: ${AHBOT_BUYER_ENABLED:-1}
+      AC_AUCTION_HOUSE_BOT_ITEMS_PER_CYCLE: ${AHBOT_ITEMS_PER_CYCLE:-150}
     ports:
       - ${WORLD_EXTERNAL_PORT:-8085}:8085
       - ${SOAP_EXTERNAL_PORT:-127.0.0.1:7878}:7878

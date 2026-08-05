@@ -76,6 +76,39 @@ RUN git init --quiet . \
     && git rev-parse HEAD > /playerbots-src/mod-playerbots.rev \
     && rm -rf .git
 
+##########################
+# Auction house bot src  #
+##########################
+
+# mod-ah-bot-plus keeps the auction house stocked, which otherwise stays empty
+# on a realm whose only other population is playerbots. It is vendored the same
+# way as mod-playerbots above so that the image never depends on whoever builds
+# it having cloned anything into `modules/`.
+#
+# The module ships no SQL and needs no CMakeLists of its own: AzerothCore's
+# module system collects `modules/<name>/src` and installs
+# `modules/<name>/conf/*.conf.dist` automatically (see modules/CMakeLists.txt).
+FROM ubuntu:$UBUNTU_VERSION AS ahbot-src
+
+ARG DEBIAN_FRONTEND=noninteractive
+ARG AHBOT_REPO="https://github.com/NathanHandley/mod-ah-bot-plus.git"
+# Branch, tag or full commit sha, resolved to a sha by CI for the same
+# build-cache reasons as PLAYERBOTS_REF.
+ARG AHBOT_REF="master"
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /ahbot-src/mod-ah-bot-plus
+
+RUN git init --quiet . \
+    && git remote add origin "$AHBOT_REPO" \
+    && git fetch --quiet --depth 1 origin "$AHBOT_REF" \
+    && git checkout --quiet --detach FETCH_HEAD \
+    && git rev-parse HEAD > /ahbot-src/mod-ah-bot-plus.rev \
+    && rm -rf .git
+
 # This target builds the docker image
 # This target can be useful to inspect the explicit outputs from the build,
 FROM skeleton AS build
@@ -116,6 +149,7 @@ COPY modules /azerothcore/modules
 # mod-playerbots is added after the rest of `modules/` so that a locally
 # checked out copy never shadows the pinned revision built into the image.
 COPY --from=playerbots-src /playerbots-src/mod-playerbots /azerothcore/modules/mod-playerbots
+COPY --from=ahbot-src /ahbot-src/mod-ah-bot-plus /azerothcore/modules/mod-ah-bot-plus
 
 ARG CACHEBUST=1
 
@@ -252,6 +286,13 @@ COPY --chown=$DOCKER_USER:$DOCKER_USER \
 COPY --chown=$DOCKER_USER:$DOCKER_USER \
      --from=playerbots-src \
      /playerbots-src/mod-playerbots.rev /azerothcore/modules/mod-playerbots.rev
+
+# mod-ah-bot-plus ships no SQL, so only the revision marker is carried into the
+# runtime image; it is what `docker compose exec` checks against to tell whether
+# a running image was built with the module.
+COPY --chown=$DOCKER_USER:$DOCKER_USER \
+     --from=ahbot-src \
+     /ahbot-src/mod-ah-bot-plus.rev /azerothcore/modules/mod-ah-bot-plus.rev
 
 VOLUME /azerothcore/env/dist/etc
 

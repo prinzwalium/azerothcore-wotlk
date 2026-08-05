@@ -23,6 +23,10 @@ on:
         description: "mod-playerbots branch, tag or commit to build against"
         required: false
         default: "master"
+      ahbot_ref:
+        description: "mod-ah-bot-plus branch, tag or commit to build against"
+        required: false
+        default: "master"
       tag:
         description: "Primary image tag to publish"
         required: false
@@ -35,6 +39,7 @@ concurrency:
 env:
   REGISTRY: ghcr.io
   PLAYERBOTS_REPO: https://github.com/mod-playerbots/mod-playerbots.git
+  AHBOT_REPO: https://github.com/NathanHandley/mod-ah-bot-plus.git
 
 jobs:
   build:
@@ -68,6 +73,17 @@ jobs:
             sha="$ref"
           fi
           echo "Building against mod-playerbots $ref ($sha)"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve mod-ah-bot-plus revision
+        id: ahbot
+        run: |
+          ref="${{ github.event.inputs.ahbot_ref || 'master' }}"
+          sha="$(git ls-remote "$AHBOT_REPO" "$ref" | head -n1 | cut -f1)"
+          if [[ -z "$sha" ]]; then
+            sha="$ref"
+          fi
+          echo "Building against mod-ah-bot-plus $ref ($sha)"
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
 
       - name: Work out image tags
@@ -108,6 +124,8 @@ jobs:
           EXTRA_TAG: ${{ github.sha }}
           PLAYERBOTS_REPO: ${{ env.PLAYERBOTS_REPO }}
           PLAYERBOTS_REF: ${{ steps.module.outputs.sha }}
+          AHBOT_REPO: ${{ env.AHBOT_REPO }}
+          AHBOT_REF: ${{ steps.ahbot.outputs.sha }}
           CACHE_FROM: type=gha,scope=acore-playerbots
           CACHE_TO: type=gha,mode=max,scope=acore-playerbots
 
@@ -117,6 +135,7 @@ jobs:
             echo "### Published images"
             echo
             echo "mod-playerbots: \`${{ steps.module.outputs.sha }}\`"
+            echo "mod-ah-bot-plus: \`${{ steps.ahbot.outputs.sha }}\`"
             echo
             for component in worldserver authserver db-import client-data; do
               echo "- \`${{ env.REGISTRY }}/${{ github.repository }}/$component:${{ steps.tags.outputs.tag }}\`"

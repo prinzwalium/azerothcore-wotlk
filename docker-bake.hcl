@@ -30,6 +30,15 @@ variable "PLAYERBOTS_REF" {
   default = "master"
 }
 
+variable "AHBOT_REPO" {
+  default = "https://github.com/NathanHandley/mod-ah-bot-plus.git"
+}
+
+# Branch, tag or commit sha of mod-ah-bot-plus to bake into the images.
+variable "AHBOT_REF" {
+  default = "master"
+}
+
 # Build cache, empty by default so that local builds don't try to talk to a
 # cache backend that only exists inside GitHub Actions. CI sets these to
 # "type=gha,scope=..." / "type=gha,mode=max,scope=...".
@@ -64,6 +73,8 @@ target "_common" {
   args = {
     PLAYERBOTS_REPO = PLAYERBOTS_REPO
     PLAYERBOTS_REF  = PLAYERBOTS_REF
+    AHBOT_REPO      = AHBOT_REPO
+    AHBOT_REF       = AHBOT_REF
     CTYPE           = BUILD_TYPE
     CTOOLS_BUILD    = TOOLS_BUILD
   }

@@ -73,6 +73,7 @@ if [[ "$ACORE_COMPONENT" == "dbimport" ]]; then
     # over: the databases are already in place at this point.
     ac_bootstrap_realmlist || echo "[bootstrap] Realmlist update failed, continuing." >&2
     ac_bootstrap_admin_account || echo "[bootstrap] Admin account creation failed, continuing." >&2
+    ac_bootstrap_ahbot || echo "[bootstrap] Auction house bot setup failed, continuing." >&2
 
     exit 0
 fi

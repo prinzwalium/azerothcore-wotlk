@@ -30,7 +30,8 @@ The first start takes a while and needs no supervision:
    mmaps, dbc). This is the long one — several GB.
 2. `ac-db-import` creates `acore_auth`, `acore_world` and `acore_characters`,
    applies the world/character SQL that ships with mod-playerbots, points the
-   realm at `REALM_ADDRESS` and creates the admin account.
+   realm at `REALM_ADDRESS`, creates the admin account, and creates the auction
+   house bot characters named in `AHBOT_CHARACTER_NAMES`.
 3. `ac-worldserver` creates and populates `acore_playerbots`, then generates the
    bot accounts and characters. Expect this to take several minutes; with the
    default of 100 bots it is a few thousand database inserts.
@@ -71,6 +72,40 @@ to start with (whisper them to a bot, or use them in party chat):
 The full command reference lives in the
 [mod-playerbots wiki](https://github.com/mod-playerbots/mod-playerbots/wiki).
 
+## The auction house bot
+
+[mod-ah-bot-plus](https://github.com/NathanHandley/mod-ah-bot-plus) is built
+into the images and keeps the auction house stocked, which otherwise stays empty
+on a realm whose only other population is bots. It both sells (lists items) and
+buys (bids on what players list).
+
+It posts auctions as real characters rather than as the server, so it needs at
+least one to exist. That is the only part of the setup that would normally be
+manual — create a character in the client, find its GUID in the database, paste
+it into the config — so the first start does it instead: `ac-db-import` creates
+a dedicated `AHBOT_ACCOUNT_USERNAME` account, creates each character in
+`AHBOT_CHARACTER_NAMES` on it, and writes their GUIDs into
+`AuctionHouseBot.GUIDs` in the shared config volume before the worldserver
+starts.
+
+The characters it creates are placeholders: they own auctions and receive the
+gold, and are not meant to be logged into. Playerbot characters deliberately are
+not used — the module warns that driving one as an auction bot will likely crash
+the server.
+
+Expect a few hours before the auction house looks full; only
+`AHBOT_ITEMS_PER_CYCLE` items are added per cycle.
+
+| Command | What it does |
+|---|---|
+| `.ahbot update` | list a batch immediately instead of waiting for the next cycle |
+| `.ahbot reload` | re-read `mod_ahbot.conf` after editing it |
+| `.ahbot empty` | remove every bot auction (player auctions are untouched) |
+
+To add more seller names later, append to `AHBOT_CHARACTER_NAMES` and
+`docker compose up -d ac-db-import` — existing characters are reused, new ones
+are created, and the GUID list is rewritten.
+
 ## Configuration
 
 Most day-to-day settings can be set in `.env` without touching any config file.
@@ -81,6 +116,7 @@ the environment as well, using an upper-snake-case name prefixed with `AC_`:
 |---|---|
 | `AiPlayerbot.MaxRandomBots` | `AC_AI_PLAYERBOT_MAX_RANDOM_BOTS` |
 | `AiPlayerbot.RandomBotAutologin` | `AC_AI_PLAYERBOT_RANDOM_BOT_AUTOLOGIN` |
+| `AuctionHouseBot.EnableSeller` | `AC_AUCTION_HOUSE_BOT_ENABLE_SELLER` |
 | `Rate.XP.Kill` | `AC_RATE_XP_KILL` |
 | `MaxPlayerLevel` | `AC_MAX_PLAYER_LEVEL` |
 | `Motd` | `AC_MOTD` |
@@ -99,7 +135,9 @@ docker compose restart ac-worldserver
 ```
 
 Environment variables win over the config file, so unset the corresponding
-`AC_*` variable if you want the file to take effect.
+`AC_*` variable if you want the file to take effect. This is also why
+`AC_AUCTION_HOUSE_BOT_GUIDS` must stay unset: it would override the GUIDs the
+first-run bootstrap discovered.
 
 ## Day-to-day operations
 
@@ -161,6 +199,24 @@ that the playerbots database exists and is populated:
 docker compose exec ac-database \
   mysql -uroot -p"$DB_ROOT_PASSWORD" -e "SELECT COUNT(*) FROM acore_playerbots.playerbots_random_bots;"
 ```
+
+**The auction house stays empty.** Check the module is in the image, the same
+way as for playerbots:
+
+```bash
+docker compose exec ac-worldserver cat /azerothcore/modules/mod-ah-bot-plus.rev
+```
+
+Then check that the seller has characters to post as:
+
+```bash
+docker compose exec ac-worldserver \
+  grep AuctionHouseBot.GUIDs /azerothcore/env/dist/etc/modules/mod_ahbot.conf
+```
+
+`= 0` means the bootstrap never ran (empty `AHBOT_CHARACTER_NAMES`) or failed —
+`docker compose logs ac-db-import | grep bootstrap` says which. Otherwise it is
+usually just time; `.ahbot update` in the worldserver console forces a batch.
 
 **Client gets stuck after choosing the realm.** `REALM_ADDRESS` was empty or
 wrong, so the realmlist still points somewhere the client cannot reach:
