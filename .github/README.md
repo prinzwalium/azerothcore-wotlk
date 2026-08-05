@@ -51,6 +51,11 @@ We have a lot of modules already made by the community, many of which can be fou
 
 Detailed installation instructions are available [here](http://www.azerothcore.org/wiki/installation).
 
+This fork publishes ready-to-run Docker images with
+[mod-playerbots](https://github.com/mod-playerbots/mod-playerbots) already built
+in, so a server can be deployed without compiling anything locally. See
+[deploy/README.md](../deploy/README.md).
+
 ## Contributing
 
 AzerothCore can also serve as a learning resource for aspiring developers who want to understand how WoW servers work, how MMORPGs are structured, how game server emulators are created, or to improve their C++ and SQL knowledge.

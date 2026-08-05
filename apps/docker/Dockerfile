@@ -39,6 +39,76 @@ RUN apt-get update                                                       \
 
 WORKDIR /azerothcore
 
+##################
+# Playerbots src #
+##################
+
+# This core is the mod-playerbots fork of AzerothCore: the playerbots patches
+# live in the core, but the actual bot AI lives in the mod-playerbots module.
+# Without the module in `modules/` at CMake configure time:
+#
+#   * `MOD_PLAYERBOTS` is never defined, so the playerbots database support in
+#     the core is compiled out,
+#   * no bot AI, no `.playerbots` commands, no `playerbots.conf` and no bots.
+#
+# So the module is vendored into the image here instead of expecting whoever
+# builds the image to clone it into `modules/` first.
+FROM ubuntu:$UBUNTU_VERSION AS playerbots-src
+
+ARG DEBIAN_FRONTEND=noninteractive
+ARG PLAYERBOTS_REPO="https://github.com/mod-playerbots/mod-playerbots.git"
+# Branch, tag or full commit sha. CI resolves the branch to a commit sha so
+# that the build cache stays keyed on the exact module revision.
+ARG PLAYERBOTS_REF="master"
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /playerbots-src/mod-playerbots
+
+# `git fetch <ref>` accepts branches, tags and commit shas alike, while
+# `git clone --branch` would reject a raw sha.
+RUN git init --quiet . \
+    && git remote add origin "$PLAYERBOTS_REPO" \
+    && git fetch --quiet --depth 1 origin "$PLAYERBOTS_REF" \
+    && git checkout --quiet --detach FETCH_HEAD \
+    && git rev-parse HEAD > /playerbots-src/mod-playerbots.rev \
+    && rm -rf .git
+
+##########################
+# Auction house bot src  #
+##########################
+
+# mod-ah-bot-plus keeps the auction house stocked, which otherwise stays empty
+# on a realm whose only other population is playerbots. It is vendored the same
+# way as mod-playerbots above so that the image never depends on whoever builds
+# it having cloned anything into `modules/`.
+#
+# The module ships no SQL and needs no CMakeLists of its own: AzerothCore's
+# module system collects `modules/<name>/src` and installs
+# `modules/<name>/conf/*.conf.dist` automatically (see modules/CMakeLists.txt).
+FROM ubuntu:$UBUNTU_VERSION AS ahbot-src
+
+ARG DEBIAN_FRONTEND=noninteractive
+ARG AHBOT_REPO="https://github.com/NathanHandley/mod-ah-bot-plus.git"
+# Branch, tag or full commit sha, resolved to a sha by CI for the same
+# build-cache reasons as PLAYERBOTS_REF.
+ARG AHBOT_REF="master"
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /ahbot-src/mod-ah-bot-plus
+
+RUN git init --quiet . \
+    && git remote add origin "$AHBOT_REPO" \
+    && git fetch --quiet --depth 1 origin "$AHBOT_REF" \
+    && git checkout --quiet --detach FETCH_HEAD \
+    && git rev-parse HEAD > /ahbot-src/mod-ah-bot-plus.rev \
+    && rm -rf .git
+
 # This target builds the docker image
 # This target can be useful to inspect the explicit outputs from the build,
 FROM skeleton AS build
@@ -75,6 +145,11 @@ COPY conf /azerothcore/conf
 COPY deps /azerothcore/deps
 COPY src /azerothcore/src
 COPY modules /azerothcore/modules
+
+# mod-playerbots is added after the rest of `modules/` so that a locally
+# checked out copy never shadows the pinned revision built into the image.
+COPY --from=playerbots-src /playerbots-src/mod-playerbots /azerothcore/modules/mod-playerbots
+COPY --from=ahbot-src /ahbot-src/mod-ah-bot-plus /azerothcore/modules/mod-ah-bot-plus
 
 ARG CACHEBUST=1
 
@@ -143,6 +218,10 @@ COPY --chown=$USER_ID:$GROUP_ID \
      --chmod=755 \
      apps/docker/entrypoint.sh /azerothcore/entrypoint.sh
 
+COPY --chown=$USER_ID:$GROUP_ID \
+     --chmod=755 \
+     apps/docker/scripts/ /azerothcore/apps/docker/scripts/
+
 USER $DOCKER_USER
 
 ENTRYPOINT ["/usr/bin/env", "bash", "/azerothcore/entrypoint.sh"]
@@ -153,6 +232,10 @@ ENTRYPOINT ["/usr/bin/env", "bash", "/azerothcore/entrypoint.sh"]
 
 FROM runtime AS authserver
 LABEL description="AzerothCore Auth Server"
+
+# ARG values are scoped per build stage, so DOCKER_USER has to be redeclared
+# here for the COPY --chown flags below to resolve to anything.
+ARG DOCKER_USER=acore
 
 ENV ACORE_COMPONENT=authserver
 # Don't run database migrations. We can leave that up to the db-import container
@@ -176,6 +259,10 @@ FROM runtime AS worldserver
 
 LABEL description="AzerothCore World Server"
 
+# ARG values are scoped per build stage, so DOCKER_USER has to be redeclared
+# here for the COPY --chown flags below to resolve to anything.
+ARG DOCKER_USER=acore
+
 ENV ACORE_COMPONENT=worldserver
 # Don't run database migrations. We can leave that up to the db-import container
 ENV AC_UPDATES_ENABLE_DATABASES=0
@@ -186,6 +273,26 @@ ENV AC_CLOSE_IDLE_CONNECTIONS=0
 COPY --chown=$DOCKER_USER:$DOCKER_USER \
      --from=build \
      /azerothcore/env/dist/bin/worldserver /azerothcore/env/dist/bin/worldserver
+
+# The playerbots database is created and populated by the module itself
+# (mod-playerbots registers its own DatabaseScript), not by the db-import
+# container, so the worldserver needs the playerbots SQL tree on disk at the
+# path that was baked in as the CMake source directory.
+COPY --chown=$DOCKER_USER:$DOCKER_USER \
+     --from=playerbots-src \
+     /playerbots-src/mod-playerbots/data/sql/playerbots \
+     /azerothcore/modules/mod-playerbots/data/sql/playerbots
+
+COPY --chown=$DOCKER_USER:$DOCKER_USER \
+     --from=playerbots-src \
+     /playerbots-src/mod-playerbots.rev /azerothcore/modules/mod-playerbots.rev
+
+# mod-ah-bot-plus ships no SQL, so only the revision marker is carried into the
+# runtime image; it is what `docker compose exec` checks against to tell whether
+# a running image was built with the module.
+COPY --chown=$DOCKER_USER:$DOCKER_USER \
+     --from=ahbot-src \
+     /ahbot-src/mod-ah-bot-plus.rev /azerothcore/modules/mod-ah-bot-plus.rev
 
 VOLUME /azerothcore/env/dist/etc
 
@@ -199,6 +306,20 @@ FROM runtime AS db-import
 
 LABEL description="AzerothCore Database Import tool"
 
+# ARG values are scoped per build stage, so they have to be redeclared here to
+# be usable in the COPY --chown flags below.
+ARG USER_ID=1000
+ARG GROUP_ID=1000
+ARG DOCKER_USER=acore
+ARG DEBIAN_FRONTEND=noninteractive
+
+# python3 is used by the first-run bootstrap in the entrypoint to compute the
+# SRP6 salt/verifier for the admin account.
+USER root
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3-minimal \
+    && rm -rf /var/lib/apt/lists/*
+
 USER $DOCKER_USER
 
 ENV ACORE_COMPONENT=dbimport
@@ -208,6 +329,12 @@ COPY --chown=$DOCKER_USER:$DOCKER_USER \
 
 COPY --chown=$DOCKER_USER:$DOCKER_USER \
     modules modules
+
+# dbimport applies the world/characters SQL shipped by every module listed in
+# AC_MODULES_LIST, so mod-playerbots has to be present here as well.
+COPY --chown=$DOCKER_USER:$DOCKER_USER \
+     --from=playerbots-src \
+     /playerbots-src/mod-playerbots /azerothcore/modules/mod-playerbots
 
 COPY --chown=$DOCKER_USER:$DOCKER_USER\
      --from=build \
@@ -256,6 +383,10 @@ CMD ["bash",  "-c", "source /azerothcore/apps/installer/includes/functions.sh &&
 FROM runtime AS tools
 
 LABEL description="AzerothCore Tools"
+
+# ARG values are scoped per build stage, so DOCKER_USER has to be redeclared
+# here for the COPY --chown flags below to resolve to anything.
+ARG DOCKER_USER=acore
 
 WORKDIR /azerothcore/env/dist/
 

@@ -1,32 +1,143 @@
-name: Build AzerothCore Playerbots
+name: Build and publish Playerbots images
+
+# Builds the AzerothCore service images with mod-playerbots baked in and pushes
+# them to GHCR, so that deploying is `docker compose pull && docker compose up`
+# instead of an hour of compiling on the target machine.
+#
+# Published images (one per compose service):
+#   ghcr.io/<owner>/azerothcore-wotlk/worldserver
+#   ghcr.io/<owner>/azerothcore-wotlk/authserver
+#   ghcr.io/<owner>/azerothcore-wotlk/db-import
+#   ghcr.io/<owner>/azerothcore-wotlk/client-data
+#
+# Each is tagged with the commit sha and, on the Playerbot branch, `latest`.
 
 on:
   push:
-    branches: [ "Playerbot" ]
+    branches:
+      - Playerbot
+      - claude/azerothcore-docker-playerbots-kpd1o0
   workflow_dispatch:
+    inputs:
+      playerbots_ref:
+        description: "mod-playerbots branch, tag or commit to build against"
+        required: false
+        default: "master"
+      ahbot_ref:
+        description: "mod-ah-bot-plus branch, tag or commit to build against"
+        required: false
+        default: "master"
+      tag:
+        description: "Primary image tag to publish"
+        required: false
+        default: ""
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   REGISTRY: ghcr.io
+  PLAYERBOTS_REPO: https://github.com/mod-playerbots/mod-playerbots.git
+  AHBOT_REPO: https://github.com/NathanHandley/mod-ah-bot-plus.git
 
 jobs:
-  build-and-push:
-    runs-on: self-hosted
+  build:
+    # Set the DOCKER_BUILD_RUNNER repository variable to use a self-hosted
+    # runner; a full core + playerbots compile takes a couple of hours on the
+    # hosted ones.
+    runs-on: ${{ vars.DOCKER_BUILD_RUNNER || 'ubuntu-latest' }}
     permissions:
       contents: read
       packages: write
 
     steps:
-      - name: Checkout repository
+      # The compile needs every gigabyte it can get on a hosted runner.
+      - name: Free up disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc "${AGENT_TOOLSDIRECTORY:-}" || true
+          df -h /
+
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Log in to the Container Registry
+      - name: Resolve mod-playerbots revision
+        id: module
+        run: |
+          ref="${{ github.event.inputs.playerbots_ref || 'master' }}"
+          # Pinning the module to an exact commit keeps the build cache stable:
+          # with a branch name every build would have to assume it moved.
+          sha="$(git ls-remote "$PLAYERBOTS_REPO" "$ref" | head -n1 | cut -f1)"
+          if [[ -z "$sha" ]]; then
+            # Not a branch or tag, so assume it already is a commit sha.
+            sha="$ref"
+          fi
+          echo "Building against mod-playerbots $ref ($sha)"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve mod-ah-bot-plus revision
+        id: ahbot
+        run: |
+          ref="${{ github.event.inputs.ahbot_ref || 'master' }}"
+          sha="$(git ls-remote "$AHBOT_REPO" "$ref" | head -n1 | cut -f1)"
+          if [[ -z "$sha" ]]; then
+            sha="$ref"
+          fi
+          echo "Building against mod-ah-bot-plus $ref ($sha)"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Work out image tags
+        id: tags
+        run: |
+          tag="${{ github.event.inputs.tag }}"
+          if [[ -z "$tag" ]]; then
+            if [[ "${{ github.ref_name }}" == "Playerbot" ]]; then
+              tag="latest"
+            else
+              # Branch names may contain slashes, which tags may not.
+              tag="${{ github.ref_name }}"
+              tag="${tag//\//-}"
+            fi
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to the container registry
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push Docker image
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # One bake invocation for all four images: the shared build stage (the
+      # part that actually takes hours) is then resolved exactly once.
+      - name: Build and push
+        uses: docker/bake-action@v5
+        with:
+          files: docker-bake.hcl
+          push: true
+        env:
+          REGISTRY: ${{ env.REGISTRY }}/${{ github.repository }}
+          TAG: ${{ steps.tags.outputs.tag }}
+          EXTRA_TAG: ${{ github.sha }}
+          PLAYERBOTS_REPO: ${{ env.PLAYERBOTS_REPO }}
+          PLAYERBOTS_REF: ${{ steps.module.outputs.sha }}
+          AHBOT_REPO: ${{ env.AHBOT_REPO }}
+          AHBOT_REF: ${{ steps.ahbot.outputs.sha }}
+          CACHE_FROM: type=gha,scope=acore-playerbots
+          CACHE_TO: type=gha,mode=max,scope=acore-playerbots
+
+      - name: Summary
         run: |
-          docker build --network=host -t ghcr.io/${{ github.repository }}:latest .
-          docker push ghcr.io/${{ github.repository }}:latest
+          {
+            echo "### Published images"
+            echo
+            echo "mod-playerbots: \`${{ steps.module.outputs.sha }}\`"
+            echo "mod-ah-bot-plus: \`${{ steps.ahbot.outputs.sha }}\`"
+            echo
+            for component in worldserver authserver db-import client-data; do
+              echo "- \`${{ env.REGISTRY }}/${{ github.repository }}/$component:${{ steps.tags.outputs.tag }}\`"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
