@@ -46,7 +46,8 @@ jobs:
     # Set the DOCKER_BUILD_RUNNER repository variable to use a self-hosted
     # runner; a full core + playerbots compile takes a couple of hours on the
     # hosted ones.
-    runs-on: ${{ vars.DOCKER_BUILD_RUNNER || 'ubuntu-latest' }}
+    runs-on: self-hosted
+    # runs-on: ${{ vars.DOCKER_BUILD_RUNNER || 'ubuntu-latest' }}
     permissions:
       contents: read
       packages: write
