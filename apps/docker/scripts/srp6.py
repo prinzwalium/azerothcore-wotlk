@@ -15,7 +15,6 @@ written to stdout, ready to be piped into the mysql client.
 
 import hashlib
 import os
-import secrets
 import sys
 
 # Algorithm parameters, byte-for-byte the ones in SRP6.cpp.
@@ -24,13 +23,18 @@ G = 7
 SALT_LENGTH = 32
 VERIFIER_LENGTH = 32
 
-MAX_ACCOUNT_LENGTH = 16
-MAX_PASS_LENGTH = 16
+# MAX_ACCOUNT_STR in src/server/game/Accounts/AccountMgr.h. The core rejects
+# anything longer than this for both the username and the password.
+MAX_ACCOUNT_LENGTH = 17
+MAX_PASS_LENGTH = 17
 
 
 def make_registration_data(username: str, password: str) -> "tuple[bytes, bytes]":
     """Return the (salt, verifier) pair for an account, both little endian."""
-    salt = secrets.token_bytes(SALT_LENGTH)
+    # os.urandom rather than secrets.token_bytes: identical source of entropy
+    # (secrets.token_bytes is a thin wrapper around it), but `os` is available
+    # even on a python3-minimal interpreter, where `secrets` is not.
+    salt = os.urandom(SALT_LENGTH)
     # v = g ^ H(s || H(u || ':' || p)) mod N
     inner = hashlib.sha1(f"{username}:{password}".encode("utf-8")).digest()
     x = int.from_bytes(hashlib.sha1(salt + inner).digest(), "little")
