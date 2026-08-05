@@ -172,8 +172,15 @@ ac_bootstrap_ahbot() {
 
     # The account exists only to own the auction characters; nobody ever logs
     # into it, so the password is random and deliberately not reported.
+    # Generated from /dev/urandom rather than python so that this works on any
+    # interpreter, and folded into the alphabet the core accepts.
     local password
-    password="$(python3 -c 'import secrets, string; print("".join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(16)))')"
+    password="$(LC_ALL=C tr -dc 'A-Z0-9' < /dev/urandom | head -c 16)"
+
+    if [[ "${#password}" -ne 16 ]]; then
+        echo "[bootstrap] Could not generate a password for the '$account' account." >&2
+        return 1
+    fi
 
     _ac_create_account "$account" "$password" 0 || {
         echo "[bootstrap] Failed to create the auction house bot account." >&2
@@ -251,6 +258,17 @@ ac_bootstrap_ahbot() {
         sed -i -E "s|^[[:space:]]*AuctionHouseBot\.GUIDs[[:space:]]*=.*|AuctionHouseBot.GUIDs = $guids|" "$conf"
     else
         printf '\nAuctionHouseBot.GUIDs = %s\n' "$guids" >> "$conf"
+    fi
+
+    # Read the value back rather than trusting the write. An unwritable etc
+    # volume (the usual cause is a host directory owned by a different uid) makes
+    # sed fail, and reporting success there sends anyone debugging an empty
+    # auction house looking in entirely the wrong place.
+    if ! grep -qE "^AuctionHouseBot\.GUIDs[[:space:]]*=[[:space:]]*$guids\$" "$conf"; then
+        echo "[bootstrap] Could not write AuctionHouseBot.GUIDs to $conf." >&2
+        echo "[bootstrap] The characters exist, but the auction house bot stays disabled" >&2
+        echo "[bootstrap] until this file is writable by uid $(id -u)." >&2
+        return 1
     fi
 
     echo "[bootstrap] AuctionHouseBot.GUIDs = $guids"

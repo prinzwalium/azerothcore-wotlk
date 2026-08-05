@@ -53,8 +53,12 @@ jobs:
       packages: write
 
     steps:
-      # The compile needs every gigabyte it can get on a hosted runner.
+      # The compile needs every gigabyte it can get on a hosted runner, where
+      # these paths are preinstalled toolchains nobody here uses and the runner
+      # is thrown away afterwards. On a self-hosted runner they are somebody's
+      # actual machine, so this must never run there.
       - name: Free up disk space
+        if: runner.environment == 'github-hosted'
         run: |
           sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc "${AGENT_TOOLSDIRECTORY:-}" || true
           df -h /

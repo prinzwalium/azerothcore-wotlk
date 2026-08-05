@@ -314,10 +314,16 @@ ARG DOCKER_USER=acore
 ARG DEBIAN_FRONTEND=noninteractive
 
 # python3 is used by the first-run bootstrap in the entrypoint to compute the
-# SRP6 salt/verifier for the admin account.
+# SRP6 salt/verifier for the accounts it creates.
+#
+# This must be `python3`, not `python3-minimal`: the minimal package ships only
+# a subset of the standard library, without `secrets` among others, so the
+# bootstrap failed with ModuleNotFoundError and every account creation silently
+# came to nothing. srp6.py no longer imports `secrets` either, but the full
+# interpreter is what keeps the next stdlib import from being a surprise.
 USER root
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends python3-minimal \
+    && apt-get install -y --no-install-recommends python3 \
     && rm -rf /var/lib/apt/lists/*
 
 USER $DOCKER_USER

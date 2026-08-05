@@ -88,6 +88,12 @@ a dedicated `AHBOT_ACCOUNT_USERNAME` account, creates each character in
 `AuctionHouseBot.GUIDs` in the shared config volume before the worldserver
 starts.
 
+Use at most 10 names. They all live on one account, and `CharactersPerRealm`
+allows 10 per account; the bootstrap inserts rows directly so nothing rejects an
+eleventh, it just leaves that account in a state the client cannot display. More
+names buy no extra listings either — `AHBOT_ITEMS_PER_CYCLE` is shared across all
+of them, so the only difference is which name players see.
+
 The characters it creates are placeholders: they own auctions and receive the
 gold, and are not meant to be logged into. Playerbot characters deliberately are
 not used — the module warns that driving one as an auction bot will likely crash
