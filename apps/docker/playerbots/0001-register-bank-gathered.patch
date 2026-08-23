@@ -1,0 +1,110 @@
+diff --git a/src/Ai/Base/ActionContext.h b/src/Ai/Base/ActionContext.h
+index 229f1b2..3fd0cad 100644
+--- a/src/Ai/Base/ActionContext.h
++++ b/src/Ai/Base/ActionContext.h
+@@ -8,6 +8,7 @@
+ #define PLAYERBOTS_ACTIONCONTEXT_H
+ 
+ #include "AddLootAction.h"
++#include "BankGatheredAction.h"
+ #include "AttackAction.h"
+ #include "ShareQuestAction.h"
+ #include "BattleGroundTactics.h"
+@@ -127,6 +128,7 @@ public:
+         creators["loot"] = &ActionContext::loot;
+         creators["add loot"] = &ActionContext::add_loot;
+         creators["add gathering loot"] = &ActionContext::add_gathering_loot;
++        creators["bank gathered"] = &ActionContext::bank_gathered;
+         creators["add all loot"] = &ActionContext::add_all_loot;
+         creators["release loot"] = &ActionContext::release_loot;
+         creators["shoot"] = &ActionContext::shoot;
+@@ -351,6 +353,7 @@ private:
+     static Action* move_from_group(PlayerbotAI* botAI) { return new MoveFromGroupAction(botAI); }
+     static Action* flee_to_group_leader(PlayerbotAI* botAI) { return new FleeToGroupLeaderAction(botAI); }
+     static Action* add_gathering_loot(PlayerbotAI* botAI) { return new AddGatheringLootAction(botAI); }
++    static Action* bank_gathered(PlayerbotAI* botAI) { return new BankGatheredAction(botAI); }
+     static Action* add_loot(PlayerbotAI* botAI) { return new AddLootAction(botAI); }
+     static Action* add_all_loot(PlayerbotAI* botAI) { return new AddAllLootAction(botAI); }
+     static Action* loot(PlayerbotAI* botAI) { return new LootAction(botAI); }
+diff --git a/src/Ai/Base/StrategyContext.h b/src/Ai/Base/StrategyContext.h
+index f60c00d..44b701b 100644
+--- a/src/Ai/Base/StrategyContext.h
++++ b/src/Ai/Base/StrategyContext.h
+@@ -28,6 +28,7 @@
+ #include "GuildStrategy.h"
+ #include "KiteStrategy.h"
+ #include "LfgStrategy.h"
++#include "BankGatheredStrategy.h"
+ #include "LootNonCombatStrategy.h"
+ #include "MaintenanceStrategy.h"
+ #include "MarkRtiStrategy.h"
+@@ -63,6 +64,7 @@ public:
+         creators["racials"] = &StrategyContext::racials;
+         creators["loot"] = &StrategyContext::loot;
+         creators["gather"] = &StrategyContext::gather;
++        creators["bank gathered"] = &StrategyContext::bank_gathered;
+         creators["emote"] = &StrategyContext::emote;
+         creators["passive"] = &StrategyContext::passive;
+         creators["aggressive"] = &StrategyContext::aggressive;
+@@ -150,6 +152,7 @@ private:
+     static Strategy* racials(PlayerbotAI* botAI) { return new RacialsStrategy(botAI); }
+     static Strategy* loot(PlayerbotAI* botAI) { return new LootNonCombatStrategy(botAI); }
+     static Strategy* gather(PlayerbotAI* botAI) { return new GatherStrategy(botAI); }
++    static Strategy* bank_gathered(PlayerbotAI* botAI) { return new BankGatheredStrategy(botAI); }
+     static Strategy* emote(PlayerbotAI* botAI) { return new EmoteStrategy(botAI); }
+     static Strategy* passive(PlayerbotAI* botAI) { return new PassiveStrategy(botAI); }
+     static Strategy* aggressive(PlayerbotAI* botAI) { return new AggressiveStrategy(botAI); }
+diff --git a/src/Ai/Base/TriggerContext.h b/src/Ai/Base/TriggerContext.h
+index c823926..4724623 100644
+--- a/src/Ai/Base/TriggerContext.h
++++ b/src/Ai/Base/TriggerContext.h
+@@ -21,6 +21,7 @@
+ #include "RpgTriggers.h"
+ #include "RtiTriggers.h"
+ #include "StuckTriggers.h"
++#include "BankGatheredTrigger.h"
+ #include "TravelTriggers.h"
+ #include "WaitForAttackTriggers.h"
+ 
+@@ -82,6 +83,7 @@ public:
+         creators["almost full energy available"] = &TriggerContext::AlmostFullEnergyAvailable;
+ 
+         creators["loot available"] = &TriggerContext::LootAvailable;
++        creators["bank gathered"] = &TriggerContext::bank_gathered;
+         creators["no attackers"] = &TriggerContext::NoAttackers;
+         creators["no target"] = &TriggerContext::NoTarget;
+         creators["target in sight"] = &TriggerContext::TargetInSight;
+@@ -342,6 +344,7 @@ private:
+     static Trigger* Random(PlayerbotAI* botAI) { return new RandomTrigger(botAI, "random", 20); }
+     static Trigger* seldom(PlayerbotAI* botAI) { return new RandomTrigger(botAI, "seldom", 300); }
+     static Trigger* often(PlayerbotAI* botAI) { return new RandomTrigger(botAI, "often", 5); }
++    static Trigger* bank_gathered(PlayerbotAI* botAI) { return new BankGatheredTrigger(botAI); }
+     static Trigger* very_often(PlayerbotAI* botAI) { return new RandomTrigger(botAI, "often", 3); }
+     static Trigger* EnemyOutOfMelee(PlayerbotAI* botAI) { return new EnemyOutOfMeleeTrigger(botAI); }
+     static Trigger* EnemyOutOfSpell(PlayerbotAI* botAI) { return new EnemyOutOfSpellRangeTrigger(botAI); }
+diff --git a/src/Ai/Base/Value/ItemUsageValue.cpp b/src/Ai/Base/Value/ItemUsageValue.cpp
+index 14625db..5efed41 100644
+--- a/src/Ai/Base/Value/ItemUsageValue.cpp
++++ b/src/Ai/Base/Value/ItemUsageValue.cpp
+@@ -16,6 +16,7 @@
+ #include "Playerbots.h"
+ #include "RandomItemMgr.h"
+ #include "ServerFacade.h"
++#include "GatheredMaterials.h"
+ #include "StatsWeightCalculator.h"
+ 
+ ItemUsage ItemUsageValue::Calculate()
+@@ -30,6 +31,13 @@ ItemUsage ItemUsageValue::Calculate()
+     if (!proto)
+         return ITEM_USAGE_NONE;
+ 
++    // Materials destined for the guild bank must not be classified as vendor
++    // trash first: DestroyItemAction treats ITEM_USAGE_VENDOR and ITEM_USAGE_AH
++    // as the first things to drop when bags fill, so the ore would be gone long
++    // before the bot ever passed a vault.
++    if (GatheredMaterials::Enabled() && bot->GetGuildId() && GatheredMaterials::IsMaterial(proto))
++        return ITEM_USAGE_KEEP;
++
+     if (botAI->HasActivePlayerMaster())
+     {
+         if (IsItemUsefulForSkill(proto) || IsItemNeededForSkill(proto))

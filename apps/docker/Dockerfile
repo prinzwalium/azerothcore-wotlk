@@ -73,7 +73,19 @@ RUN git init --quiet . \
     && git remote add origin "$PLAYERBOTS_REPO" \
     && git fetch --quiet --depth 1 origin "$PLAYERBOTS_REF" \
     && git checkout --quiet --detach FETCH_HEAD \
-    && git rev-parse HEAD > /playerbots-src/mod-playerbots.rev \
+    && git rev-parse HEAD > /playerbots-src/mod-playerbots.rev
+
+# Local additions to mod-playerbots, kept here rather than in a fork of the
+# module so that upgrading it stays "bump PLAYERBOTS_REF".
+#
+# The new files are copied in (a new file can never conflict); only the handful
+# of registration lines are a patch. If upstream moves those, `git apply` fails
+# and the build stops here, which is the point: a silently dropped registration
+# would produce a working image with a strategy that does not exist.
+COPY apps/docker/playerbots/src /playerbots-src/mod-playerbots/src
+COPY apps/docker/playerbots/0001-register-bank-gathered.patch /tmp/
+
+RUN git apply --verbose /tmp/0001-register-bank-gathered.patch \
     && rm -rf .git
 
 ##########################
