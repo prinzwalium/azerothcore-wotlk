@@ -19,6 +19,34 @@ If a patch stops applying the build **fails at that step**, on purpose: a
 registration silently dropped would produce an image that looks fine and has a
 strategy no bot can run.
 
+## When the patch stops applying
+
+`PLAYERBOTS_REF` defaults to `master`, which the publish workflow resolves to
+whatever that branch points at *today*. So an upstream change near one of the
+four anchors breaks the build, with the failing hunk named in the log:
+
+```
+error: patch failed: src/Ai/Base/Value/ItemUsageValue.cpp:30
+error: src/Ai/Base/Value/ItemUsageValue.cpp: patch does not apply
+```
+
+That has already happened once, when upstream replaced
+`botAI->HasActivePlayerMaster()` with `IsRealPlayer(botAI->GetMaster())` three
+lines below the insertion point. To regenerate:
+
+```bash
+git clone --depth 1 https://github.com/mod-playerbots/mod-playerbots.git
+cd mod-playerbots
+# re-apply the four edits listed below, then:
+git diff > /path/to/apps/docker/playerbots/0001-register-bank-gathered.patch
+```
+
+The patch currently applies against `5397110`. If these breakages get annoying,
+pin `PLAYERBOTS_REF` in `docker-bake.hcl` to a known-good sha: builds then stop
+drifting, and updating the module becomes a deliberate act that regenerates the
+patch at the same time. The cost is no longer picking up upstream fixes on their
+own.
+
 ## What is added
 
 A `bank gathered` non-combat strategy: a bot carrying gathered materials that is
