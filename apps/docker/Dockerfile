@@ -83,10 +83,16 @@ RUN git init --quiet . \
 # and the build stops here, which is the point: a silently dropped registration
 # would produce a working image with a strategy that does not exist.
 COPY apps/docker/playerbots/src /playerbots-src/mod-playerbots/src
-COPY apps/docker/playerbots/0001-register-bank-gathered.patch /tmp/
+COPY apps/docker/playerbots/*.patch /tmp/playerbots-patches/
 
-RUN git apply --verbose /tmp/0001-register-bank-gathered.patch \
-    && rm -rf .git
+# Applied in name order, each one separately, so a hunk that upstream has moved
+# names itself in the log instead of failing the whole set anonymously.
+RUN set -eu; \
+    for patch in /tmp/playerbots-patches/*.patch; do \
+        echo "applying $(basename "$patch")"; \
+        git apply --verbose "$patch"; \
+    done; \
+    rm -rf .git
 
 ##########################
 # Auction house bot src  #

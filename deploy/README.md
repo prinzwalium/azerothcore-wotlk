@@ -72,6 +72,51 @@ to start with (whisper them to a bot, or use them in party chat):
 The full command reference lives in the
 [mod-playerbots wiki](https://github.com/mod-playerbots/mod-playerbots/wiki).
 
+## Talking to bots in plain language
+
+Bots can take instructions as ordinary sentences, translated by a local
+[Ollama](https://ollama.com) instance. "wait here while I tame this wolf"
+becomes `stay`; "ok come on" becomes `follow`.
+
+This is a **translator, not a chatbot**. The model is asked for exactly one bot
+command and its answer is checked against an allow list before it reaches a bot,
+so a misread sentence does nothing rather than something surprising. That is
+also why a small local model is enough — the job is picking one command, not
+writing prose.
+
+Start Ollama alongside the rest and pull a model into it once:
+
+```bash
+docker compose --profile ai up -d
+docker compose exec ac-ollama ollama pull llama3.1:8b
+```
+
+Then in `.env`:
+
+```bash
+AI_ENABLED=1
+AI_COMMAND_SCOPES=whisper,party
+AI_COMMAND_FROM=master
+```
+
+and `docker compose up -d ac-worldserver`. Whisper a bot "wait here" and it
+should whisper back `(stay)` and stop following.
+
+Things worth knowing before you rely on it:
+
+* **A GPU matters.** On the 3060 an 8B model answers in about a second, which
+  reads as natural. On CPU it takes long enough that you will have moved on.
+* **`AI_COMMAND_FROM=master` is the safe default.** Set it to `group` only if
+  you trust everyone you play with, since it lets any group member steer your
+  bots.
+* **Destructive commands are not on the list.** `destroy`, `sell`, `buy`,
+  `trade`, `mail`, `leave` and the guild commands are deliberately excluded, and
+  should not be added lightly.
+* **"Until" is not supported.** "wait until I've tamed this" produces `stay`;
+  you still say "follow" afterwards.
+
+The full option set is in `apps/docker/playerbots/README.md`.
+
 ## Bots banking gathered materials
 
 Bots already gather — the `gather` strategy is on by default and they are

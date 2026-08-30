@@ -90,3 +90,77 @@ rather than a patch this size.
 The strategy is registered but not on by default. Switch it on for the bot
 population with `AiPlayerbot.RandomBotNonCombatStrategies = "+bank gathered"`, or
 for one bot with `nc +bank gathered`.
+
+# Plain language to bot commands (Ollama)
+
+`src/Ai/Ollama/` translates what a player types at a bot into one of the bot's
+own chat commands, using a local Ollama instance. "wait here while I tame this
+wolf" becomes `stay`; "ok come on" becomes `follow`.
+
+It is a **translator, not a chatbot**. The model is asked for one command and
+nothing else, and its answer is checked against an allow list before it reaches
+a bot. Anything outside that list is dropped and logged. A misread sentence is
+therefore a no-op rather than a surprise action, which is what makes a small
+local model good enough for this: the task is classification, and the validator
+is the safety net rather than the model's good behaviour.
+
+## How it hangs together
+
+| File | Role |
+|---|---|
+| `AiChatUtil.h` | pure helpers: JSON escape/extract, HTTP body, command normalisation, the allow-list check. No AzerothCore types, so it can be tested on its own |
+| `AiChatConfig.{h,cpp}` | settings, read once per config load rather than per chat line |
+| `OllamaClient.{h,cpp}` | one blocking POST to `/api/chat`, hand written over Asio |
+| `AiChatBridge.{h,cpp}` | request queue, worker threads, and the world-tick drain that dispatches |
+| `AiChatScript.cpp` | the chat hooks and the world script, registered by `0002-register-ai-chat.patch` |
+
+The world thread never makes the HTTP call. A chat hook enqueues a request and
+returns immediately; a worker thread talks to Ollama; `WorldScript::OnUpdate`
+drains finished answers and dispatches them. Nothing but plain values crosses
+that boundary — players are referred to by `ObjectGuid` and resolved again at
+dispatch, because a bot can log out while the model is still thinking.
+
+Commands are handed to `PlayerbotAI::HandleCommand` exactly as if the player had
+whispered them, so they go through the module's own parsing and permission
+checks rather than around them.
+
+## Configuration
+
+| Option | Default | Meaning |
+|---|---|---|
+| `AiPlayerbot.Ai.Enabled` | `false` | master switch |
+| `AiPlayerbot.Ai.Host` / `.Port` / `.Path` | `ollama` / `11434` / `/api/chat` | where Ollama is |
+| `AiPlayerbot.Ai.Model` | `llama3.1:8b` | model tag to ask for |
+| `AiPlayerbot.Ai.CommandScopes` | `whisper,party` | chat that gets translated (`whisper`, `party`, `guild`, `say`) |
+| `AiPlayerbot.Ai.CommandFrom` | `master` | `master` or `group` — who may drive a bot |
+| `AiPlayerbot.Ai.Commands` | see below | the allow list the model is held to |
+| `AiPlayerbot.Ai.TimeoutMs` | `8000` | give up on a reply after this long |
+| `AiPlayerbot.Ai.Workers` | `2` | concurrent requests (clamped to 1-8) |
+| `AiPlayerbot.Ai.MaxQueue` | `32` | requests dropped rather than queued past this |
+| `AiPlayerbot.Ai.CooldownMs` | `3000` | minimum gap between translations per bot |
+| `AiPlayerbot.Ai.Confirm` | `true` | whisper back the command that was understood |
+| `AiPlayerbot.Ai.SystemPrompt` | see source | `{COMMANDS}` is replaced with the allow list |
+
+The default allow list is deliberately narrow:
+
+```
+follow, stay, flee, runaway, grind, attack, pull, rti, formation, summon,
+repair, buff, home, max dps, tank attack, wait for attack, focus heal targets,
+co, nc
+```
+
+`destroy`, `sell`, `buy`, `trade`, `mail`, `leave` and everything under `guild`
+are **not** on it, and should not be added lightly: a model misreading "don't
+sell that" must not be able to sell it. `co` and `nc` are included because they
+carry strategy toggles (`co +passive`, `nc +bank gathered`), which is what makes
+the vocabulary useful rather than just movement.
+
+## What it does not do
+
+* **No conditionals.** "wait until I've tamed this" produces `stay`; nothing
+  resumes following on its own. Supporting "until X" needs a deferred trigger
+  layer that does not exist here.
+* **No chat flavour.** This only produces commands. Bots still speak from the
+  `ai_playerbot_texts` table.
+* Literal commands are ignored rather than translated, so typing `stay` is not
+  dispatched twice.
