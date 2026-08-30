@@ -43,11 +43,18 @@ env:
 
 jobs:
   build:
-    # Set the DOCKER_BUILD_RUNNER repository variable to use a self-hosted
-    # runner; a full core + playerbots compile takes a couple of hours on the
-    # hosted ones.
-    runs-on: self-hosted
-    # runs-on: ${{ vars.DOCKER_BUILD_RUNNER || 'ubuntu-latest' }}
+    # GitHub-hosted. Slower than a self-hosted machine (about 55 minutes for a
+    # full core + modules compile, against roughly 20 on a decent desktop) but
+    # it needs nothing maintained: a self-hosted runner has to have Docker
+    # installed, its daemon running at boot, and the runner's user in the docker
+    # group, and each of those failing looks like a red build rather than a
+    # broken machine.
+    #
+    # To go back to self-hosted, swap the line below for `self-hosted` (or
+    # `${{ vars.DOCKER_BUILD_RUNNER || 'ubuntu-latest' }}` to drive it from a
+    # repository variable). The disk-cleanup step below keys off
+    # runner.environment, so it follows automatically either way.
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write

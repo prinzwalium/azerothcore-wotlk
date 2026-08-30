@@ -72,6 +72,39 @@ to start with (whisper them to a bot, or use them in party chat):
 The full command reference lives in the
 [mod-playerbots wiki](https://github.com/mod-playerbots/mod-playerbots/wiki).
 
+## Bots banking gathered materials
+
+Bots already gather — the `gather` strategy is on by default and they are
+generated with herbalism, mining and skinning. What they never did is keep any
+of it: unwanted trade goods are classified as vendor trash and sold, or destroyed
+outright when bags fill.
+
+Set `PLAYERBOTS_BANK_GATHERED=1` and add the strategy to the bot population:
+
+```bash
+PLAYERBOTS_BANK_GATHERED=1
+PLAYERBOTS_RANDOM_BOT_NONCOMBAT_STRATEGIES=+bank gathered
+```
+
+A bot carrying at least `PLAYERBOTS_BANK_GATHERED_MIN_ITEMS` stacks of material
+that walks past a guild vault it may deposit into empties them into the first
+tab, and those materials are marked "keep" so nothing sells or destroys them in
+the meantime.
+
+Two things to be aware of:
+
+* **It is opportunistic.** Bots bank when their wandering takes them past a
+  vault; they do not make a trip to one. How much arrives depends on how much
+  time your bots spend in cities. Sending them deliberately would mean a travel
+  destination type, which is a much larger change — see
+  `apps/docker/playerbots/README.md`.
+* **A tab holds 98 stacks.** With a hundred bots this fills. Keep
+  `PLAYERBOTS_BANK_GATHERED_SUBCLASSES` tight (the default `6,7,9` is leather,
+  ore and herbs) and buy tabs, or it will stop accepting deposits.
+
+Bots also form their own guilds, and those bots bank into *their* guild, not
+yours. Only bots you invite contribute to your bank.
+
 ## The auction house bot
 
 [mod-ah-bot-plus](https://github.com/NathanHandley/mod-ah-bot-plus) is built
