@@ -17,6 +17,7 @@ on:
     branches:
       - Playerbot
       - claude/azerothcore-docker-playerbots-kpd1o0
+      - claude/azerothcore-ollama-bot-commands
   workflow_dispatch:
     inputs:
       playerbots_ref:
