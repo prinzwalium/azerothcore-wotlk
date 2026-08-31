@@ -108,6 +108,11 @@ services:
     image: ${AC_IMAGE_REGISTRY:-ghcr.io/prinzwalium/azerothcore-wotlk}/worldserver:${AC_IMAGE_TAG:-latest}
     networks:
       - ac-network
+    # Lets the container reach a service listening on the host, which is how
+    # AI_HOST=host.docker.internal finds an Ollama running on this machine.
+    # Harmless when the AI is off or Ollama lives elsewhere.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     stdin_open: true
     tty: true
     restart: unless-stopped
@@ -133,10 +138,12 @@ services:
       AC_AI_PLAYERBOT_BANK_GATHERED_SUB_CLASSES: ${PLAYERBOTS_BANK_GATHERED_SUBCLASSES:-6,7,9}
       AC_AI_PLAYERBOT_BANK_GATHERED_MIN_ITEMS: ${PLAYERBOTS_BANK_GATHERED_MIN_ITEMS:-4}
       AC_AI_PLAYERBOT_RANDOM_BOT_NON_COMBAT_STRATEGIES: ${PLAYERBOTS_RANDOM_BOT_NONCOMBAT_STRATEGIES:-}
-      # Natural language to bot commands via Ollama. Needs the `ai` profile
-      # below to be started as well, and a model pulled into it.
+      # Natural language to bot commands, against an Ollama server you already
+      # run. Nothing here starts one: point AI_HOST at it. For an Ollama on this
+      # same machine, `host.docker.internal` works via the extra_hosts entry
+      # below; on another box use its hostname or IP.
       AC_AI_PLAYERBOT_AI_ENABLED: ${AI_ENABLED:-0}
-      AC_AI_PLAYERBOT_AI_HOST: ${AI_HOST:-ac-ollama}
+      AC_AI_PLAYERBOT_AI_HOST: ${AI_HOST:-host.docker.internal}
       AC_AI_PLAYERBOT_AI_PORT: ${AI_PORT:-11434}
       AC_AI_PLAYERBOT_AI_MODEL: ${AI_MODEL:-llama3.1:8b}
       AC_AI_PLAYERBOT_AI_COMMAND_SCOPES: ${AI_COMMAND_SCOPES:-whisper,party}
@@ -170,34 +177,11 @@ services:
       ac-client-data-init:
         condition: service_completed_successfully
 
-  # Only started with `docker compose --profile ai up -d`, so a realm that does
-  # not want the AI never pulls the image. Pull a model into it once with:
-  #   docker compose exec ac-ollama ollama pull llama3.1:8b
-  ac-ollama:
-    container_name: ac-ollama
-    image: ollama/ollama:latest
-    profiles: ["ai"]
-    networks:
-      - ac-network
-    volumes:
-      - ac-ollama:/root/.ollama
-    restart: unless-stopped
-    # Requires the NVIDIA container runtime on the host. Drop this block to run
-    # on CPU -- it works, but replies take long enough to feel broken in chat.
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-
 volumes:
   ac-database:
   ac-client-data:
   ac-etc:
   ac-logs:
-  ac-ollama:
 
 networks:
   ac-network:

@@ -84,17 +84,18 @@ so a misread sentence does nothing rather than something surprising. That is
 also why a small local model is enough — the job is picking one command, not
 writing prose.
 
-Start Ollama alongside the rest and pull a model into it once:
+This connects to an Ollama server you already run — nothing in the compose file
+starts one. Make sure the model is pulled there:
 
 ```bash
-docker compose --profile ai up -d
-docker compose exec ac-ollama ollama pull llama3.1:8b
+ollama pull llama3.1:8b
 ```
 
 Then in `.env`:
 
 ```bash
 AI_ENABLED=1
+AI_HOST=host.docker.internal   # or the hostname/IP of your Ollama box
 AI_COMMAND_SCOPES=whisper,party
 AI_COMMAND_FROM=master
 ```
@@ -102,10 +103,23 @@ AI_COMMAND_FROM=master
 and `docker compose up -d ac-worldserver`. Whisper a bot "wait here" and it
 should whisper back `(stay)` and stop following.
 
+`host.docker.internal` resolves to the host because the compose file maps it to
+the host gateway; for Ollama on another machine use its address instead. Either
+way Ollama has to be listening somewhere the container can reach it — it binds
+to localhost only unless started with `OLLAMA_HOST=0.0.0.0`, which is the usual
+reason the first attempt gets a connection refused.
+
+Check the wiring without leaving the server:
+
+```bash
+docker compose exec ac-worldserver \
+  bash -c 'exec 3<>/dev/tcp/${AC_AI_PLAYERBOT_AI_HOST}/${AC_AI_PLAYERBOT_AI_PORT} && echo reachable'
+```
+
 Things worth knowing before you rely on it:
 
-* **A GPU matters.** On the 3060 an 8B model answers in about a second, which
-  reads as natural. On CPU it takes long enough that you will have moved on.
+* **A GPU on the Ollama side matters.** An 8B model answers in about a second,
+  which reads as natural. On CPU it takes long enough that you will have moved on.
 * **`AI_COMMAND_FROM=master` is the safe default.** Set it to `group` only if
   you trust everyone you play with, since it lets any group member steer your
   bots.

@@ -11,6 +11,9 @@ of it: upgrading stays "bump `PLAYERBOTS_REF`".
 |---|---|
 | `src/` | copied into `modules/mod-playerbots/src`, merging with what is already there |
 | `0001-register-bank-gathered.patch` | `git apply` against the checkout |
+| `0002-register-ai-chat.patch` | likewise |
+
+Every `*.patch` in this directory is applied, in name order.
 
 New files go in `src/` and are picked up by AzerothCore's module glob with no
 CMake changes. Only edits to files that already exist upstream belong in a patch.
@@ -94,8 +97,9 @@ for one bot with `nc +bank gathered`.
 # Plain language to bot commands (Ollama)
 
 `src/Ai/Ollama/` translates what a player types at a bot into one of the bot's
-own chat commands, using a local Ollama instance. "wait here while I tame this
-wolf" becomes `stay`; "ok come on" becomes `follow`.
+own chat commands, using an Ollama server you point it at — nothing here runs
+one. "wait here while I tame this wolf" becomes `stay`; "ok come on" becomes
+`follow`.
 
 It is a **translator, not a chatbot**. The model is asked for one command and
 nothing else, and its answer is checked against an allow list before it reaches
@@ -129,7 +133,7 @@ checks rather than around them.
 | Option | Default | Meaning |
 |---|---|---|
 | `AiPlayerbot.Ai.Enabled` | `false` | master switch |
-| `AiPlayerbot.Ai.Host` / `.Port` / `.Path` | `ollama` / `11434` / `/api/chat` | where Ollama is |
+| `AiPlayerbot.Ai.Host` / `.Port` / `.Path` | `ollama` / `11434` / `/api/chat` | where Ollama is; the deploy compose overrides Host with `AI_HOST`, defaulting to `host.docker.internal` |
 | `AiPlayerbot.Ai.Model` | `llama3.1:8b` | model tag to ask for |
 | `AiPlayerbot.Ai.CommandScopes` | `whisper,party` | chat that gets translated (`whisper`, `party`, `guild`, `say`) |
 | `AiPlayerbot.Ai.CommandFrom` | `master` | `master` or `group` — who may drive a bot |
