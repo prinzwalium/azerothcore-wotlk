@@ -208,6 +208,32 @@ playerbots database itself.
 To pin a specific build instead, set `AC_IMAGE_TAG` to a commit sha — every
 build is tagged with the sha it was built from.
 
+The configs are in a volume that outlives the image, so an update has to
+reconcile them. On every start the entrypoint:
+
+* overwrites every `.conf.dist` with the image's copy — these are reference
+  files, not yours;
+* creates any `.conf` that does not exist yet from its `.dist`;
+* appends to each existing `.conf` the options its `.dist` has and it does not,
+  under a dated comment.
+
+Your edits are never touched: only keys absent from the file are added, so the
+step is a no-op once the file is current. It is also what keeps a new module
+release from starting with a screenful of
+
+```
+> Config: Missing property AiPlayerbot.LevelBrackets.Enabled in config file ...
+```
+
+Those are warnings — the server starts and uses the default named in the message
+— but the default compiled into the code and the one the config ships are not
+always the same, so it is worth not ignoring.
+
+Note that mod-playerbots is built from `master`, resolved when the image is
+built. Its options can therefore appear, change meaning, or disappear between two
+`docker compose pull`s. `apps/docker/playerbots/README.md` covers pinning
+`PLAYERBOTS_REF` if you would rather update deliberately.
+
 ## Where the images come from
 
 `.github/workflows/docker-build.yml` builds them from this repository (the
@@ -256,6 +282,25 @@ docker compose exec ac-worldserver \
 `= 0` means the bootstrap never ran (empty `AHBOT_CHARACTER_NAMES`) or failed —
 `docker compose logs ac-db-import | grep bootstrap` says which. Otherwise it is
 usually just time; `.ahbot update` in the worldserver console forces a batch.
+
+**The worldserver logs "Missing property ..." for a lot of options.** The config
+in the volume is older than the module in the image. A restart is enough — the
+entrypoint appends the new options (see [Updating](#updating)) — but on an image
+predating that, refresh the file by hand:
+
+```bash
+docker compose stop ac-worldserver
+docker compose cp ac-worldserver:/azerothcore/env/dist/etc/modules/playerbots.conf ./playerbots.conf.bak
+docker compose run --rm --no-deps --entrypoint sh ac-worldserver -c \
+  'cp -v /azerothcore/env/ref/etc/modules/playerbots.conf.dist \
+        /azerothcore/env/dist/etc/modules/playerbots.conf'
+docker compose start ac-worldserver
+```
+
+That resets `playerbots.conf` to the shipped defaults, so diff it against the
+backup for anything you had changed. Do not do the same to `mod_ahbot.conf`: it
+holds the `AuctionHouseBot.GUIDs` the first-run bootstrap discovered, and
+overwriting it silently stops the auction house bot.
 
 **Client gets stuck after choosing the realm.** `REALM_ADDRESS` was empty or
 wrong, so the realmlist still points somewhere the client cannot reach:
