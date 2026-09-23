@@ -32,11 +32,18 @@ jobs:
       - name: Checkout AzerothCore
         uses: actions/checkout@v7
 
+      # Same pin as the other builds and the published images -- see the
+      # PLAYERBOTS_REF variable in docker-bake.hcl.
+      - name: Resolve the pinned mod-playerbots revision
+        id: pin
+        shell: bash
+        run: echo "ref=$(apps/docker/scripts/bake-default.sh PLAYERBOTS_REF)" >> "$GITHUB_OUTPUT"
+
       - name: Checkout Playerbot Module
         uses: actions/checkout@v7
         with:
           repository: mod-playerbots/mod-playerbots
-          ref: ${{ github.ref_name == 'Playerbot' && 'master' || 'test-staging' }}
+          ref: ${{ steps.pin.outputs.ref }}
           path: modules/mod-playerbots
 
       - name: ccache

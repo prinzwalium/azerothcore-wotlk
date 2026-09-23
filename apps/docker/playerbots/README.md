@@ -24,9 +24,9 @@ strategy no bot can run.
 `PLAYERBOTS_REF` is a commit sha, not `master`. It lives in one place, the
 `PLAYERBOTS_REF` variable in `docker-bake.hcl`. Everything that consumes the
 module reads it from there via `apps/docker/scripts/bake-default.sh` —
-`docker-build.yml`, which publishes the images, and `core-build-playerbots.yml`,
-which compiles the core against the module on every PR — and the `ARG` in the
-Dockerfile matches it for a bare `docker build`.
+`docker-build.yml` publishes the images, and `core-build-playerbots.yml`,
+`macos_build.yml` and `windows_build.yml` compile the core against the module on
+every PR — and the `ARG` in the Dockerfile matches it for a bare `docker build`.
 
 Currently `b6696bd` (2026-09-11).
 
