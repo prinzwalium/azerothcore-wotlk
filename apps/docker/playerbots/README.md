@@ -19,33 +19,56 @@ If a patch stops applying the build **fails at that step**, on purpose: a
 registration silently dropped would produce an image that looks fine and has a
 strategy no bot can run.
 
-## When the patch stops applying
+## The pin
 
-`PLAYERBOTS_REF` defaults to `master`, which the publish workflow resolves to
-whatever that branch points at *today*. So an upstream change near one of the
-four anchors breaks the build, with the failing hunk named in the log:
+`PLAYERBOTS_REF` is a commit sha, not `master`. It lives in one place, the
+`PLAYERBOTS_REF` variable in `docker-bake.hcl`; the publish workflow reads it
+from there via `apps/docker/scripts/bake-default.sh` rather than keeping its own
+copy, and the `ARG` in the Dockerfile matches it for a bare `docker build`.
+
+Currently `b6696bd` (2026-09-11).
+
+Tracking `master` did not work. Upstream moves quickly and twice broke the build
+on a change unrelated to anything here:
 
 ```
 error: patch failed: src/Ai/Base/Value/ItemUsageValue.cpp:30
 error: src/Ai/Base/Value/ItemUsageValue.cpp: patch does not apply
 ```
 
-That has already happened once, when upstream replaced
-`botAI->HasActivePlayerMaster()` with `IsRealPlayer(botAI->GetMaster())` three
-lines below the insertion point. To regenerate:
+first when `botAI->HasActivePlayerMaster()` became
+`IsRealPlayer(botAI->GetMaster())` three lines below the insertion point, then
+again shortly after. A branch also means a new module release can add config
+options mid-deployment, which a running server logs as `Missing property
+AiPlayerbot.*` on its next restart.
 
-```bash
-git clone --depth 1 https://github.com/mod-playerbots/mod-playerbots.git
-cd mod-playerbots
-# re-apply the four edits listed below, then:
-git diff > /path/to/apps/docker/playerbots/0001-register-bank-gathered.patch
-```
+The cost is that upstream fixes no longer arrive on their own.
 
-The patch currently applies against `5397110`. If these breakages get annoying,
-pin `PLAYERBOTS_REF` in `docker-bake.hcl` to a known-good sha: builds then stop
-drifting, and updating the module becomes a deliberate act that regenerates the
-patch at the same time. The cost is no longer picking up upstream fixes on their
-own.
+## Updating the module
+
+1. Pick the new revision and check the patch against it before changing
+   anything:
+
+   ```bash
+   git clone https://github.com/mod-playerbots/mod-playerbots.git
+   cd mod-playerbots && git checkout <new-sha>
+   cp -r /path/to/apps/docker/playerbots/src/. src/
+   git apply --check /path/to/apps/docker/playerbots/0001-register-bank-gathered.patch
+   ```
+
+2. If that fails, re-apply the four edits listed under *What is added* by hand
+   and regenerate:
+
+   ```bash
+   git diff > /path/to/apps/docker/playerbots/0001-register-bank-gathered.patch
+   ```
+
+3. Bump `PLAYERBOTS_REF` in `docker-bake.hcl` and the `ARG` default in
+   `apps/docker/Dockerfile`, and update the sha named above.
+
+To build against `master` once without moving the pin, run the workflow manually
+and put `master` in the *mod-playerbots branch, tag or commit* field — left
+blank it uses the pin.
 
 ## What is added
 

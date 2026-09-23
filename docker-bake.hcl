@@ -26,8 +26,19 @@ variable "PLAYERBOTS_REPO" {
 }
 
 # Branch, tag or commit sha of mod-playerbots to bake into the images.
+#
+# Pinned, not "master". The module is vendored with a patch over four
+# registration points (apps/docker/playerbots/), and upstream moves them often
+# enough that tracking a branch turned every build into a coin toss: twice
+# already a build broke on `git apply` for an upstream change unrelated to
+# anything here, and a new module release silently added config options that a
+# running deployment then logged as missing. Updating is now a deliberate act:
+# bump this, regenerate the patch if `git apply` says to, rebuild.
+#
+# This is the single source of truth -- the workflow reads the default from
+# here rather than keeping its own copy.
 variable "PLAYERBOTS_REF" {
-  default = "master"
+  default = "b6696bdbd3740e575598d167d69f39f68cc0b907"
 }
 
 variable "AHBOT_REPO" {

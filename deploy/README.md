@@ -229,10 +229,10 @@ Those are warnings — the server starts and uses the default named in the messa
 — but the default compiled into the code and the one the config ships are not
 always the same, so it is worth not ignoring.
 
-Note that mod-playerbots is built from `master`, resolved when the image is
-built. Its options can therefore appear, change meaning, or disappear between two
-`docker compose pull`s. `apps/docker/playerbots/README.md` covers pinning
-`PLAYERBOTS_REF` if you would rather update deliberately.
+mod-playerbots itself is pinned to a commit rather than tracking `master`, so a
+`docker compose pull` picks up changes made in this repository but not whatever
+upstream did that week. Moving to a newer module revision is a deliberate bump —
+`apps/docker/playerbots/README.md` has the procedure.
 
 ## Where the images come from
 
@@ -241,9 +241,12 @@ mod-playerbots fork of the core) with `mod-playerbots` vendored in at a pinned
 revision, and pushes them to GHCR. To build them yourself:
 
 ```bash
-REGISTRY=my.registry/azerothcore PLAYERBOTS_REF=master \
-  docker buildx bake -f docker-bake.hcl --push
+REGISTRY=my.registry/azerothcore docker buildx bake -f docker-bake.hcl --push
 ```
+
+That uses the pinned module revision. Add `PLAYERBOTS_REF=master` to build
+against upstream's tip instead, which may fail at the `git apply` step — see
+`apps/docker/playerbots/README.md`.
 
 or, from a checkout of this repository, `docker compose build` using the
 top-level `docker-compose.yml`.
