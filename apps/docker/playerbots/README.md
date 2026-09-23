@@ -22,9 +22,11 @@ strategy no bot can run.
 ## The pin
 
 `PLAYERBOTS_REF` is a commit sha, not `master`. It lives in one place, the
-`PLAYERBOTS_REF` variable in `docker-bake.hcl`; the publish workflow reads it
-from there via `apps/docker/scripts/bake-default.sh` rather than keeping its own
-copy, and the `ARG` in the Dockerfile matches it for a bare `docker build`.
+`PLAYERBOTS_REF` variable in `docker-bake.hcl`. Everything that consumes the
+module reads it from there via `apps/docker/scripts/bake-default.sh` —
+`docker-build.yml`, which publishes the images, and `core-build-playerbots.yml`,
+which compiles the core against the module on every PR — and the `ARG` in the
+Dockerfile matches it for a bare `docker build`.
 
 Currently `b6696bd` (2026-09-11).
 
@@ -41,6 +43,17 @@ first when `botAI->HasActivePlayerMaster()` became
 again shortly after. A branch also means a new module release can add config
 options mid-deployment, which a running server logs as `Missing property
 AiPlayerbot.*` on its next restart.
+
+Upstream has since gone further and made the module require a newer core than
+this fork carries — its `src/Db/PlayerbotsDatabase.h` includes the core header
+`ModuleDatabasePool.h`, which does not exist here:
+
+```
+fatal error: 'ModuleDatabasePool.h' file not found
+```
+
+So the pin is currently load-bearing, not just tidiness: moving it forward means
+bringing the core up to date too.
 
 The cost is that upstream fixes no longer arrive on their own.
 
