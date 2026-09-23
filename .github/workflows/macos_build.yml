@@ -26,18 +26,34 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - macos-14
+          # macos-14 is past the point where Homebrew builds bottles for it, so
+          # `install-deps` fell back to compiling MySQL from source and died:
+          #
+          #   You are using macOS 14. ... Homebrew no longer builds bottles for
+          #   this configuration.
+          #   make: *** [all] Error 2
+          #
+          # The job never reached AzerothCore itself. Bottles exist again on 15.
+          - macos-15
     runs-on: ${{ matrix.os }}
     name: ${{ matrix.os }}
     steps:
       - name: Checkout AzerothCore
         uses: actions/checkout@v7
 
+      # Same pin as the other builds and the published images -- see the
+      # PLAYERBOTS_REF variable in docker-bake.hcl. Upstream's tip needs a newer
+      # core than this fork has, so tracking it fails before compiling anything
+      # of ours.
+      - name: Resolve the pinned mod-playerbots revision
+        id: pin
+        run: echo "ref=$(apps/docker/scripts/bake-default.sh PLAYERBOTS_REF)" >> "$GITHUB_OUTPUT"
+
       - name: Checkout Playerbot Module
         uses: actions/checkout@v7
         with:
           repository: mod-playerbots/mod-playerbots
-          ref: ${{ github.ref_name == 'Playerbot' && 'master' || 'test-staging' }}
+          ref: ${{ steps.pin.outputs.ref }}
           path: modules/mod-playerbots
 
       - name: Cache

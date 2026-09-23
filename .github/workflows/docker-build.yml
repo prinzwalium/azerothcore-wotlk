@@ -20,13 +20,13 @@ on:
   workflow_dispatch:
     inputs:
       playerbots_ref:
-        description: "mod-playerbots branch, tag or commit to build against"
+        description: "mod-playerbots branch, tag or commit (blank = the pin in docker-bake.hcl)"
         required: false
-        default: "master"
+        default: ""
       ahbot_ref:
-        description: "mod-ah-bot-plus branch, tag or commit to build against"
+        description: "mod-ah-bot-plus branch, tag or commit (blank = the default in docker-bake.hcl)"
         required: false
-        default: "master"
+        default: ""
       tag:
         description: "Primary image tag to publish"
         required: false
@@ -43,11 +43,18 @@ env:
 
 jobs:
   build:
-    # Set the DOCKER_BUILD_RUNNER repository variable to use a self-hosted
-    # runner; a full core + playerbots compile takes a couple of hours on the
-    # hosted ones.
-    runs-on: self-hosted
-    # runs-on: ${{ vars.DOCKER_BUILD_RUNNER || 'ubuntu-latest' }}
+    # GitHub-hosted. Slower than a self-hosted machine (about 55 minutes for a
+    # full core + modules compile, against roughly 20 on a decent desktop) but
+    # it needs nothing maintained: a self-hosted runner has to have Docker
+    # installed, its daemon running at boot, and the runner's user in the docker
+    # group, and each of those failing looks like a red build rather than a
+    # broken machine.
+    #
+    # To go back to self-hosted, swap the line below for `self-hosted` (or
+    # `${{ vars.DOCKER_BUILD_RUNNER || 'ubuntu-latest' }}` to drive it from a
+    # repository variable). The disk-cleanup step below keys off
+    # runner.environment, so it follows automatically either way.
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
@@ -69,9 +76,15 @@ jobs:
       - name: Resolve mod-playerbots revision
         id: module
         run: |
-          ref="${{ github.event.inputs.playerbots_ref || 'master' }}"
-          # Pinning the module to an exact commit keeps the build cache stable:
-          # with a branch name every build would have to assume it moved.
+          ref="${{ github.event.inputs.playerbots_ref }}"
+          if [[ -z "$ref" ]]; then
+            # docker-bake.hcl holds the pin, so that a local `docker buildx bake`
+            # and this workflow cannot disagree about which revision is current.
+            ref="$(apps/docker/scripts/bake-default.sh PLAYERBOTS_REF)"
+          fi
+          # A branch or tag still gets resolved to the commit it points at, which
+          # keeps the build cache stable: with a branch name every build would
+          # have to assume it moved. A sha resolves to itself.
           sha="$(git ls-remote "$PLAYERBOTS_REPO" "$ref" | head -n1 | cut -f1)"
           if [[ -z "$sha" ]]; then
             # Not a branch or tag, so assume it already is a commit sha.
@@ -83,7 +96,10 @@ jobs:
       - name: Resolve mod-ah-bot-plus revision
         id: ahbot
         run: |
-          ref="${{ github.event.inputs.ahbot_ref || 'master' }}"
+          ref="${{ github.event.inputs.ahbot_ref }}"
+          if [[ -z "$ref" ]]; then
+            ref="$(apps/docker/scripts/bake-default.sh AHBOT_REF)"
+          fi
           sha="$(git ls-remote "$AHBOT_REPO" "$ref" | head -n1 | cut -f1)"
           if [[ -z "$sha" ]]; then
             sha="$ref"

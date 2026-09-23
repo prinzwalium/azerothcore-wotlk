@@ -72,6 +72,39 @@ to start with (whisper them to a bot, or use them in party chat):
 The full command reference lives in the
 [mod-playerbots wiki](https://github.com/mod-playerbots/mod-playerbots/wiki).
 
+## Bots banking gathered materials
+
+Bots already gather — the `gather` strategy is on by default and they are
+generated with herbalism, mining and skinning. What they never did is keep any
+of it: unwanted trade goods are classified as vendor trash and sold, or destroyed
+outright when bags fill.
+
+Set `PLAYERBOTS_BANK_GATHERED=1` and add the strategy to the bot population:
+
+```bash
+PLAYERBOTS_BANK_GATHERED=1
+PLAYERBOTS_RANDOM_BOT_NONCOMBAT_STRATEGIES=+bank gathered
+```
+
+A bot carrying at least `PLAYERBOTS_BANK_GATHERED_MIN_ITEMS` stacks of material
+that walks past a guild vault it may deposit into empties them into the first
+tab, and those materials are marked "keep" so nothing sells or destroys them in
+the meantime.
+
+Two things to be aware of:
+
+* **It is opportunistic.** Bots bank when their wandering takes them past a
+  vault; they do not make a trip to one. How much arrives depends on how much
+  time your bots spend in cities. Sending them deliberately would mean a travel
+  destination type, which is a much larger change — see
+  `apps/docker/playerbots/README.md`.
+* **A tab holds 98 stacks.** With a hundred bots this fills. Keep
+  `PLAYERBOTS_BANK_GATHERED_SUBCLASSES` tight (the default `6,7,9` is leather,
+  ore and herbs) and buy tabs, or it will stop accepting deposits.
+
+Bots also form their own guilds, and those bots bank into *their* guild, not
+yours. Only bots you invite contribute to your bank.
+
 ## The auction house bot
 
 [mod-ah-bot-plus](https://github.com/NathanHandley/mod-ah-bot-plus) is built
@@ -175,6 +208,32 @@ playerbots database itself.
 To pin a specific build instead, set `AC_IMAGE_TAG` to a commit sha — every
 build is tagged with the sha it was built from.
 
+The configs are in a volume that outlives the image, so an update has to
+reconcile them. On every start the entrypoint:
+
+* overwrites every `.conf.dist` with the image's copy — these are reference
+  files, not yours;
+* creates any `.conf` that does not exist yet from its `.dist`;
+* appends to each existing `.conf` the options its `.dist` has and it does not,
+  under a dated comment.
+
+Your edits are never touched: only keys absent from the file are added, so the
+step is a no-op once the file is current. It is also what keeps a new module
+release from starting with a screenful of
+
+```
+> Config: Missing property AiPlayerbot.LevelBrackets.Enabled in config file ...
+```
+
+Those are warnings — the server starts and uses the default named in the message
+— but the default compiled into the code and the one the config ships are not
+always the same, so it is worth not ignoring.
+
+mod-playerbots itself is pinned to a commit rather than tracking `master`, so a
+`docker compose pull` picks up changes made in this repository but not whatever
+upstream did that week. Moving to a newer module revision is a deliberate bump —
+`apps/docker/playerbots/README.md` has the procedure.
+
 ## Where the images come from
 
 `.github/workflows/docker-build.yml` builds them from this repository (the
@@ -182,9 +241,12 @@ mod-playerbots fork of the core) with `mod-playerbots` vendored in at a pinned
 revision, and pushes them to GHCR. To build them yourself:
 
 ```bash
-REGISTRY=my.registry/azerothcore PLAYERBOTS_REF=master \
-  docker buildx bake -f docker-bake.hcl --push
+REGISTRY=my.registry/azerothcore docker buildx bake -f docker-bake.hcl --push
 ```
+
+That uses the pinned module revision. Add `PLAYERBOTS_REF=master` to build
+against upstream's tip instead, which may fail at the `git apply` step — see
+`apps/docker/playerbots/README.md`.
 
 or, from a checkout of this repository, `docker compose build` using the
 top-level `docker-compose.yml`.
@@ -223,6 +285,25 @@ docker compose exec ac-worldserver \
 `= 0` means the bootstrap never ran (empty `AHBOT_CHARACTER_NAMES`) or failed —
 `docker compose logs ac-db-import | grep bootstrap` says which. Otherwise it is
 usually just time; `.ahbot update` in the worldserver console forces a batch.
+
+**The worldserver logs "Missing property ..." for a lot of options.** The config
+in the volume is older than the module in the image. A restart is enough — the
+entrypoint appends the new options (see [Updating](#updating)) — but on an image
+predating that, refresh the file by hand:
+
+```bash
+docker compose stop ac-worldserver
+docker compose cp ac-worldserver:/azerothcore/env/dist/etc/modules/playerbots.conf ./playerbots.conf.bak
+docker compose run --rm --no-deps --entrypoint sh ac-worldserver -c \
+  'cp -v /azerothcore/env/ref/etc/modules/playerbots.conf.dist \
+        /azerothcore/env/dist/etc/modules/playerbots.conf'
+docker compose start ac-worldserver
+```
+
+That resets `playerbots.conf` to the shipped defaults, so diff it against the
+backup for anything you had changed. Do not do the same to `mod_ahbot.conf`: it
+holds the `AuctionHouseBot.GUIDs` the first-run bootstrap discovered, and
+overwriting it silently stops the auction house bot.
 
 **Client gets stuck after choosing the realm.** `REALM_ADDRESS` was empty or
 wrong, so the realmlist still points somewhere the client cannot reach:

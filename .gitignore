@@ -49,6 +49,10 @@ CMakeLists.txt.user
 *.bak
 *.patch
 *.diff
+
+# Patches under apps/docker are build inputs, not stray local diffs: the image
+# build applies them to the module sources it fetches.
+!apps/docker/**/*.patch
 *.REMOTE.*
 *.BACKUP.*
 *.BASE.*

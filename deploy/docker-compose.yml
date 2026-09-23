@@ -126,6 +126,13 @@ services:
       AC_AI_PLAYERBOT_RANDOM_BOT_AUTOLOGIN: ${PLAYERBOTS_RANDOM_BOT_AUTOLOGIN:-1}
       AC_AI_PLAYERBOT_MIN_RANDOM_BOTS: ${PLAYERBOTS_MIN_RANDOM_BOTS:-100}
       AC_AI_PLAYERBOT_MAX_RANDOM_BOTS: ${PLAYERBOTS_MAX_RANDOM_BOTS:-100}
+      # Guild bank deposits of gathered materials. The strategy itself has to be
+      # switched on for random bots as well, which is what the strategy list
+      # below does; without it the strategy exists but no bot runs it.
+      AC_AI_PLAYERBOT_BANK_GATHERED_ENABLED: ${PLAYERBOTS_BANK_GATHERED:-0}
+      AC_AI_PLAYERBOT_BANK_GATHERED_SUB_CLASSES: ${PLAYERBOTS_BANK_GATHERED_SUBCLASSES:-6,7,9}
+      AC_AI_PLAYERBOT_BANK_GATHERED_MIN_ITEMS: ${PLAYERBOTS_BANK_GATHERED_MIN_ITEMS:-4}
+      AC_AI_PLAYERBOT_RANDOM_BOT_NON_COMBAT_STRATEGIES: ${PLAYERBOTS_RANDOM_BOT_NONCOMBAT_STRATEGIES:-}
       # Auction house bot (mod-ah-bot-plus). The seller only does anything once
       # AuctionHouseBot.GUIDs names real characters, which ac-db-import writes
       # into etc/modules/mod_ahbot.conf on the first start.

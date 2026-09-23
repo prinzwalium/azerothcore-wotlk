@@ -39,12 +39,26 @@ jobs:
         run: |
           echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
 
+      # The module revision is pinned in docker-bake.hcl and read from there, so
+      # that this job and the published images are built against the same code.
+      # It used to check out upstream's tip, which meant a red build here the
+      # moment upstream depended on something this core does not have -- as
+      # happened when mod-playerbots' new src/Db/PlayerbotsDatabase.h started
+      # including the core header ModuleDatabasePool.h:
+      #
+      #   fatal error: 'ModuleDatabasePool.h' file not found
+      #
+      # To check whether upstream's tip builds again, run this workflow with the
+      # ref below temporarily set to 'master'.
+      - name: Resolve the pinned mod-playerbots revision
+        id: pin
+        run: echo "ref=$(apps/docker/scripts/bake-default.sh PLAYERBOTS_REF)" >> "$GITHUB_OUTPUT"
+
       - name: Checkout Playerbot Module
         uses: actions/checkout@v3
         with:
           repository: mod-playerbots/mod-playerbots
-          # Map AC branch → PB branch
-          ref: ${{ github.ref_name == 'Playerbot' && 'master' || 'test-staging' }}
+          ref: ${{ steps.pin.outputs.ref }}
           path: modules/mod-playerbots
 
       - name: Install Requirements
