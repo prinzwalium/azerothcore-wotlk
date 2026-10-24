@@ -169,9 +169,19 @@ void AiChatBridge::Update()
     for (Result const& result : ready)
         Dispatch(result);
 
-    // Keep the cooldown map from growing with every bot that ever spoke.
+    // Keep the cooldown map from growing with every bot that ever spoke, by
+    // pruning entries that have expired rather than wiping the whole map: a
+    // wipe would drop every bot's cooldown at once and let a burst of
+    // re-submissions through right after it.
     if (_cooldowns.size() > 4096)
-        _cooldowns.clear();
+    {
+        auto const now = std::chrono::steady_clock::now();
+        auto const cutoff = now - std::chrono::milliseconds(
+            AiChatConfig::instance().cooldownMs);
+
+        for (auto it = _cooldowns.begin(); it != _cooldowns.end();)
+            it = (it->second <= cutoff) ? _cooldowns.erase(it) : std::next(it);
+    }
 }
 
 void AiChatBridge::Dispatch(Result const& result)
@@ -180,7 +190,9 @@ void AiChatBridge::Dispatch(Result const& result)
 
     if (!result.ok)
     {
-        LOG_DEBUG("playerbots", "AiChat: request failed: {}", result.error);
+        // Deliberately visible: with only a debug line, an operator cannot
+        // tell a disabled feature from a broken Ollama connection.
+        LOG_WARN("playerbots", "AiChat: request failed: {}", result.error);
         return;
     }
 

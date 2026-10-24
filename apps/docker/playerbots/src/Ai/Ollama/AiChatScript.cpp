@@ -9,6 +9,7 @@
 #include "AiChatUtil.h"
 #include "Playerbots.h"
 #include "ScriptMgr.h"
+#include "WorldSessionMgr.h"
 
 namespace
 {
@@ -124,13 +125,29 @@ public:
         return true;
     }
 
+    // Guild: "commandFromGuild" names the guild, not the sender's group, so
+    // every online bot in the sender's guild considers the message. Guild
+    // exposes no member iteration, so walk the session map and match on guild
+    // membership; only online members can be commanded anyway.
+    //
+    // That is a wide scope (which is why it is off by default), but it is what
+    // the option promises; anything narrower belongs in a different option.
     bool OnPlayerCanUseChat(Player* player, uint32 /*type*/, uint32 /*language*/, std::string& msg,
-                            Guild* /*guild*/) override
+                            Guild* guild) override
     {
-        if (!AiChatConfig::instance().commandFromGuild || !player || !Ready(msg))
+        if (!AiChatConfig::instance().commandFromGuild || !player || !guild || !Ready(msg))
             return true;
 
-        ConsiderGroup(player, msg);
+        for (auto const& [accID, session] : sWorldSessionMgr->GetAllSessions())
+        {
+            Player* member = session->GetPlayer();
+            if (!member || !member->IsInWorld() || member->GetGuildId() != player->GetGuildId())
+                continue;
+
+            if (GET_PLAYERBOT_AI(member))
+                Consider(member, player, msg);
+        }
+
         return true;
     }
 };

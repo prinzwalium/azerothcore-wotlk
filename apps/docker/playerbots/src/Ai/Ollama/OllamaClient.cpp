@@ -13,6 +13,8 @@
 #ifndef _WIN32
 #include <sys/socket.h>
 #include <sys/time.h>
+#else
+#include <winsock2.h>
 #endif
 
 namespace
@@ -38,7 +40,7 @@ namespace
         return body;
     }
 
-    void ApplyTimeout(tcp::socket& socket, uint32_t timeoutMs)
+    void ApplyTimeout(boost::asio::ip::tcp::socket& socket, uint32_t timeoutMs)
     {
 #ifndef _WIN32
         timeval tv{};
@@ -49,8 +51,13 @@ namespace
         ::setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
         ::setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
 #else
-        (void)socket;
-        (void)timeoutMs;
+        // On Windows, setsockopt(SO_RCVTIMEO) takes a DWORD milliseconds
+        // value rather than a timeval; without it a hung Ollama would block
+        // a worker thread forever and quietly wedge the whole bridge.
+        DWORD const ms = timeoutMs;
+        int const fd = static_cast<int>(socket.native_handle());
+        ::setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<char const*>(&ms), sizeof(ms));
+        ::setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<char const*>(&ms), sizeof(ms));
 #endif
     }
 }
