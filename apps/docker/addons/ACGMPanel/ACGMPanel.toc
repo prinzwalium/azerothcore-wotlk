@@ -1,0 +1,15 @@
+## Interface: 30300
+## Title: AzerothCore |cFF4DB8D4GM Admin Panel|r
+## Notes: In-game GUI for GM actions and server administration, over the AzerothCore addon command channel.
+## Author: prinzwalium
+## Version: 1.0.0
+## X-Category: Administration
+## SavedVariables: ACGMPanelDB
+
+Init.lua
+Commands.lua
+Console.lua
+Panel.lua
+QuickActions.lua
+Playerbots.lua
+Tickets.lua
